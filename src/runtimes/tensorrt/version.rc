@@ -1,0 +1,35 @@
+#include <windows.h>
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 0,1,0,0
+ PRODUCTVERSION 0,1,0,0
+ FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+ FILEFLAGS VS_FF_DEBUG
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_DLL
+ FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "080404B0"
+        BEGIN
+            VALUE "CompanyName", "lw"
+            VALUE "FileDescription", "lw.PPOCR.Inference TensorRT Runtime"
+            VALUE "FileVersion", "0.1.0"
+            VALUE "InternalName", "lw.PPOCR.Runtime.TensorRT.dll"
+            VALUE "LegalCopyright", "Copyright (C) lw"
+            VALUE "OriginalFilename", "lw.PPOCR.Runtime.TensorRT.dll"
+            VALUE "ProductName", "lw.PPOCR.Inference"
+            VALUE "ProductVersion", "0.1.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0804, 1200
+    END
+END
+

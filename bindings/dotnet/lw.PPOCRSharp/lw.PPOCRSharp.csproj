@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Lw.PPOCRSharp</RootNamespace>
+    <AssemblyName>lw.PPOCRSharp</AssemblyName>
+    <Description>.NET binding for the language-neutral lw.PPOCR.Inference C ABI.</Description>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,36 @@
+# Build and package output
+/build/
+/out/
+/dist/
+**/bin/
+**/obj/
+
+# Visual Studio and editor state
+/.vs/
+/.vscode/
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
+
+# Native build artifacts
+*.pdb
+*.ilk
+*.idb
+*.ipdb
+*.iobj
+
+# Machine-specific TensorRT artifacts
+*.engine
+
+# Downloaded SDK archives and extracted SDK directories
+*.zip
+*.7z
+*.rar
+*.msi
+*.nupkg
+/TensorRT-*/
+/openvino_toolkit_*/
+/opencv-*/
+/onnxruntime-*/
+/cuda-*/

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <NativeBuildDir Condition="'$(NativeBuildDir)' == ''">$(MSBuildThisFileDirectory)..\..\..\..\build\ninja-x64\bin</NativeBuildDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\lw.PPOCRSharp\lw.PPOCRSharp.csproj" />
+  </ItemGroup>
+
+  <Target Name="CopyNativeSmokeArtifacts" AfterTargets="Build">
+    <ItemGroup>
+      <NativeSmokeArtifact Include="$(NativeBuildDir)\lw.PPOCR.dll"
+                           Condition="Exists('$(NativeBuildDir)\lw.PPOCR.dll')" />
+      <NativeSmokeArtifact Include="$(NativeBuildDir)\lw.PPOCR.Runtime.Stub.dll"
+                           Condition="Exists('$(NativeBuildDir)\lw.PPOCR.Runtime.Stub.dll')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(NativeSmokeArtifact)"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true"
+          Condition="'@(NativeSmokeArtifact)' != ''" />
+  </Target>
+</Project>
+
