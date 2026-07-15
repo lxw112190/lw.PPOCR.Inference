@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(lw.PPOCR.Inference VERSION 0.1.0 LANGUAGES C CXX)
+project(lw.PPOCR.Inference VERSION 0.2.0 LANGUAGES C CXX)
 
 if(NOT WIN32)
     message(FATAL_ERROR "The initial lw.PPOCR.Inference loader targets Windows.")
@@ -78,7 +78,9 @@ install(FILES
     docs/architecture.md
     docs/migration-roadmap.md
     docs/performance-report.md
+    docs/releases/v0.2.0.md
     docs/releases/v0.1.0.md
+    docs/stability-testing.md
     docs/tensorrt-engines.md
     models/model-manifest.schema.json
     DESTINATION docs

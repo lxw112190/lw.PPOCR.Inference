@@ -176,7 +176,7 @@ lw_ppocr_status LW_PPOCR_CALL lw_ppocr_get_version(lw_ppocr_version* version) {
     version->minor = LW_PPOCR_VERSION_MINOR;
     version->patch = LW_PPOCR_VERSION_PATCH;
     version->product_name_utf8 = "lw.PPOCR.Inference";
-    version->version_utf8 = "0.1.0";
+    version->version_utf8 = "0.2.0";
     ClearLastError();
     return LW_PPOCR_STATUS_OK;
 }

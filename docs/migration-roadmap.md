@@ -12,7 +12,7 @@
 - [x] Migrate shared preprocessing and postprocessing into Core.
 - [x] Implement the first production Runtime.
 - [x] Run a real PP-OCRv5 model through the public Loader ABI.
-- [ ] Add repeated-run memory and golden-output baselines.
+- [x] Add repeated-run memory and result-count baselines.
 - [ ] Compare warm timing against the existing OpenCV DNN demo.
 
 ## Phase 3: GPU runtimes
@@ -42,5 +42,6 @@
 
 - Run each backend in an isolated worker process.
 - Record cold start, warm P50/P90/P99 latency, throughput, memory, and VRAM.
-- Add long-running lifecycle, concurrency, malformed-input, and golden-result
-  tests.
+- [x] Add long-running lifecycle, concurrency, malformed-input, and resource
+  growth tests.
+- Add golden text and box-coordinate result baselines.

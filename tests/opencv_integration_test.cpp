@@ -2,19 +2,82 @@
 
 #include <opencv2/imgcodecs.hpp>
 
+#include <atomic>
+#include <cstdlib>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <vector>
 
+#if defined(_WIN32)
+#include <windows.h>
+#include <psapi.h>
+#endif
+
 namespace {
+
+struct ProcessSnapshot {
+    uint64_t private_bytes = 0;
+    uint32_t handles = 0;
+};
 
 int Fail(const std::string& message) {
     std::cerr << "FAILED: " << message << '\n';
     return 1;
+}
+
+int EnvironmentInteger(const char* name, int fallback) {
+    const char* value = std::getenv(name);
+    if (value == nullptr || *value == '\0') {
+        return fallback;
+    }
+    try {
+        const int parsed = std::stoi(value);
+        return parsed > 0 ? parsed : 0;
+    } catch (...) {
+        return fallback;
+    }
+}
+
+ProcessSnapshot Snapshot() {
+    ProcessSnapshot snapshot{};
+#if defined(_WIN32)
+    PROCESS_MEMORY_COUNTERS_EX counters{};
+    counters.cb = sizeof(counters);
+    if (GetProcessMemoryInfo(
+            GetCurrentProcess(),
+            reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&counters),
+            sizeof(counters)) != FALSE) {
+        snapshot.private_bytes = counters.PrivateUsage;
+    }
+    DWORD handles = 0;
+    if (GetProcessHandleCount(GetCurrentProcess(), &handles) != FALSE) {
+        snapshot.handles = handles;
+    }
+#endif
+    return snapshot;
+}
+
+bool RunAndValidate(
+    lw_ppocr_handle engine,
+    const lw_ppocr_image& image,
+    uint64_t expected_region_count) {
+    lw_ppocr_result* result = nullptr;
+    const lw_ppocr_status status = lw_ppocr_run(engine, &image, &result);
+    if (status != LW_PPOCR_STATUS_OK || result == nullptr ||
+        result->region_count != expected_region_count) {
+        if (result != nullptr) {
+            lw_ppocr_result_free(engine, result);
+        }
+        return false;
+    }
+    lw_ppocr_result_free(engine, result);
+    return true;
 }
 
 std::string LastError(lw_ppocr_handle handle) {
@@ -193,7 +256,7 @@ int main(int argc, char** argv) {
         image.pixel_format = LW_PPOCR_PIXEL_FORMAT_BGR24;
 
         if (use_directml || use_openvino || use_tensorrt) {
-            const int warmup_count = use_openvino || use_tensorrt ? 8 : 1;
+            const int warmup_count = 8;
             for (int iteration = 0; iteration < warmup_count; ++iteration) {
                 lw_ppocr_result* warmup = nullptr;
                 const lw_ppocr_status warmup_status =
@@ -238,7 +301,86 @@ int main(int argc, char** argv) {
         PrintTiming("rec", result->recognizer);
         PrintTiming("pipeline", result->pipeline);
 
+        const uint64_t expected_region_count = result->region_count;
         lw_ppocr_result_free(engine, result);
+
+        const int stress_iterations =
+            EnvironmentInteger("LW_PPOCR_STRESS_ITERATIONS", 0);
+        const int stress_threads =
+            EnvironmentInteger("LW_PPOCR_STRESS_THREADS", 0);
+        const int stress_runs_per_thread =
+            EnvironmentInteger("LW_PPOCR_STRESS_RUNS_PER_THREAD", 10);
+        const ProcessSnapshot stress_baseline = Snapshot();
+
+        for (int iteration = 0; iteration < stress_iterations; ++iteration) {
+            if (!RunAndValidate(engine, image, expected_region_count)) {
+                const std::string error = LastError(engine);
+                lw_ppocr_destroy(&engine);
+                std::filesystem::remove(manifest);
+                return Fail("long-running inference failed at iteration " +
+                    std::to_string(iteration) + ": " + error);
+            }
+        }
+
+        std::atomic<int> thread_failures{0};
+        std::vector<std::thread> workers;
+        workers.reserve(static_cast<size_t>(stress_threads));
+        for (int thread_index = 0; thread_index < stress_threads;
+             ++thread_index) {
+            workers.emplace_back([&]() {
+                for (int iteration = 0; iteration < stress_runs_per_thread;
+                     ++iteration) {
+                    if (!RunAndValidate(engine, image, expected_region_count)) {
+                        ++thread_failures;
+                        return;
+                    }
+                }
+            });
+        }
+        for (std::thread& worker : workers) {
+            worker.join();
+        }
+        if (thread_failures.load() != 0) {
+            const std::string error = LastError(engine);
+            lw_ppocr_destroy(&engine);
+            std::filesystem::remove(manifest);
+            return Fail("concurrent inference failed: " + error);
+        }
+
+        const ProcessSnapshot stress_completed = Snapshot();
+        constexpr uint64_t kMaxPrivateGrowth = 256ULL * 1024ULL * 1024ULL;
+        constexpr uint32_t kMaxHandleGrowth = 32;
+        if (stress_baseline.private_bytes != 0 &&
+            stress_completed.private_bytes >
+                stress_baseline.private_bytes + kMaxPrivateGrowth) {
+            lw_ppocr_destroy(&engine);
+            std::filesystem::remove(manifest);
+            return Fail("private memory grew by more than 256 MiB");
+        }
+        if (stress_baseline.handles != 0 && stress_completed.handles >
+                stress_baseline.handles + kMaxHandleGrowth) {
+            lw_ppocr_destroy(&engine);
+            std::filesystem::remove(manifest);
+            return Fail("process handle count grew unexpectedly");
+        }
+        if (stress_iterations > 0 || stress_threads > 0) {
+            std::cout << "Stability stress passed: sequential_runs="
+                      << stress_iterations << ", concurrent_runs="
+                      << stress_threads * stress_runs_per_thread
+                      << ", private_growth="
+                      << (stress_completed.private_bytes >=
+                                  stress_baseline.private_bytes
+                              ? stress_completed.private_bytes -
+                                    stress_baseline.private_bytes
+                              : 0)
+                      << " bytes, handle_growth="
+                      << (stress_completed.handles >= stress_baseline.handles
+                              ? stress_completed.handles -
+                                    stress_baseline.handles
+                              : 0)
+                      << '\n';
+        }
+
         lw_ppocr_destroy(&engine);
         std::filesystem::remove(manifest);
         if (engine != nullptr) {

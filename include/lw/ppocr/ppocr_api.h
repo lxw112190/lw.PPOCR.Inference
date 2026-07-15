@@ -21,10 +21,18 @@ extern "C" {
 #define LW_PPOCR_API_VERSION 1u
 #define LW_PPOCR_ABI_FINGERPRINT UINT64_C(0x4C5750504F435201)
 #define LW_PPOCR_VERSION_MAJOR 0u
-#define LW_PPOCR_VERSION_MINOR 1u
+#define LW_PPOCR_VERSION_MINOR 2u
 #define LW_PPOCR_VERSION_PATCH 0u
 
 typedef struct lw_ppocr_engine* lw_ppocr_handle;
+
+/*
+ * Threading contract:
+ * - Separate handles are independent and may be used concurrently.
+ * - Calls to run/run_json on one handle are safe and may be serialized by the Runtime.
+ * - A result or string must be freed with the same handle that created it.
+ * - Destroy is not concurrent: finish all calls and free all results before destroy.
+ */
 typedef int32_t lw_ppocr_status;
 typedef int32_t lw_ppocr_backend;
 typedef int32_t lw_ppocr_pixel_format;

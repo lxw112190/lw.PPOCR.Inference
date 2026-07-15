@@ -18,6 +18,20 @@ Applications only change backend configuration when switching inference framewor
 - Model packages described by `model.json`, without hard-coded artifact names
 - Instance-owned configuration, workers, and memory with explicit initialization and destruction
 
+## Thread Safety and Stability
+
+- Different OCR engine instances are independent and may run concurrently.
+- One instance accepts concurrent `Run` calls; a Runtime may serialize inference
+  internally.
+- Structured results and JSON strings must be freed by the same instance that
+  created them.
+- `Destroy` must not overlap inference. Finish all calls and free all results
+  before destroying the engine.
+
+Version 0.2.0 adds lifecycle, 10,000-call sequential, eight-thread shared-engine,
+multiple-instance, and real-model stress coverage for all four backends. See
+[stability testing](docs/stability-testing.md) for commands and resource limits.
+
 ## Backends
 
 | Backend | Device | Main advantage | Recommended use |
