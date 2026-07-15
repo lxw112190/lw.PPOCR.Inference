@@ -78,6 +78,7 @@ install(FILES
     docs/architecture.md
     docs/migration-roadmap.md
     docs/performance-report.md
+    docs/releases/v0.1.0.md
     docs/tensorrt-engines.md
     models/model-manifest.schema.json
     DESTINATION docs
