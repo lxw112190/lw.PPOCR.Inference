@@ -1,12 +1,12 @@
-# Linux x64 ONNX Runtime（CPU / NVIDIA CUDA）使用说明
+# Linux x64 ONNX Runtime（CPU / NVIDIA CUDA）使用说明（v1.3.0）
 
 该发行包使用官方 ONNX Runtime 1.26.0，并包含完整 OCR、仅识别接口、HTTP 服务、测试网页和 PP-OCRv6 tiny 模型。默认包内是 CPU 版 ONNX Runtime，解压后无需安装 Python，也无需安装 ONNX Runtime。
 
 ## 1. CPU 版快速启动
 
 ```bash
-tar -xzf lw.PPOCR.Inference-v1.3.0-preview.1-linux-x64-onnxruntime-cpu.tar.gz
-cd lw.PPOCR.Inference-v1.3.0-preview.1-linux-x64-onnxruntime-cpu
+tar -xzf lw.PPOCR.Inference-v1.3.0-linux-x64-onnxruntime-cpu.tar.gz
+cd lw.PPOCR.Inference-v1.3.0-linux-x64-onnxruntime-cpu
 sudo ./install-deps-ubuntu.sh
 ./run-http-service.sh
 ```
@@ -49,7 +49,7 @@ CUDA 12 示例：
 
 ```bash
 tar -xzf onnxruntime-linux-x64-gpu-1.26.0.tgz
-cd lw.PPOCR.Inference-v1.3.0-preview.1-linux-x64-onnxruntime-cpu
+cd lw.PPOCR.Inference-v1.3.0-linux-x64-onnxruntime-cpu
 mkdir -p runtimes/linux-x64/onnxruntime/cpu-backup
 cp -a runtimes/linux-x64/onnxruntime/libonnxruntime*.so* \
   runtimes/linux-x64/onnxruntime/cpu-backup/

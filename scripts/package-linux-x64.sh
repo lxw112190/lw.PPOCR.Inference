@@ -7,8 +7,8 @@ if [[ $# -lt 1 || $# -gt 3 ]]; then
 fi
 
 BUILD_DIR="$(cd -- "$1" && pwd)"
-OUTPUT_DIR="${2:-dist/releases/v1.2.0}"
-VERSION="${3:-1.2.0}"
+OUTPUT_DIR="${2:-dist/releases/v1.3.0}"
+VERSION="${3:-1.3.0}"
 PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 mkdir -p "${OUTPUT_DIR}"
 OUTPUT_DIR="$(cd -- "${OUTPUT_DIR}" && pwd)"

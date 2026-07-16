@@ -1,24 +1,24 @@
-# Linux OpenVINO CPU HTTP 服务部署（v1.3.0 预览）
+# Linux OpenVINO CPU HTTP 服务部署（v1.3.0）
 
 该包面向 **Ubuntu 20.04 x86_64**，使用官方 **OpenVINO 2025.2.0 Ubuntu 20.04** 归档构建。发布包已经包含 Loader、OpenVINO CPU Runtime、ONNX frontend、oneTBB、最小 OpenCV 5.0 共享库、PP-OCRv6 tiny 模型、HTTP 服务、测试网页和 systemd 脚本；目标机器不需要另外安装 OpenVINO SDK。
 
-当前预览版只开放 `CPU`。项目曾在 OpenVINO GPU 路径复现 OpenCL 映射错误，因此在完成独立的 Linux Intel GPU 正确性和压力测试前，不把 GPU 混入这个基线包。
+当前正式版只开放 `CPU`。项目曾在 OpenVINO GPU 路径复现 OpenCL 映射错误，因此在完成独立的 Linux Intel GPU 正确性和压力测试前，不把 GPU 混入这个稳定包。
 
 ## 1. 下载与解压
 
 GitHub Actions Artifact ZIP 中包含：
 
 ```text
-lw.PPOCR.Inference-v1.3.0-preview.1-linux-x64-openvino-cpu.tar.gz
-lw.PPOCR.Inference-v1.3.0-preview.1-linux-x64-openvino-cpu.tar.gz.sha256
+lw.PPOCR.Inference-v1.3.0-linux-x64-openvino-cpu.tar.gz
+lw.PPOCR.Inference-v1.3.0-linux-x64-openvino-cpu.tar.gz.sha256
 ```
 
 复制到 Ubuntu 后执行：
 
 ```bash
-sha256sum -c lw.PPOCR.Inference-v1.3.0-preview.1-linux-x64-openvino-cpu.tar.gz.sha256
-tar -xzf lw.PPOCR.Inference-v1.3.0-preview.1-linux-x64-openvino-cpu.tar.gz
-cd lw.PPOCR.Inference-v1.3.0-preview.1-linux-x64-openvino-cpu
+sha256sum -c lw.PPOCR.Inference-v1.3.0-linux-x64-openvino-cpu.tar.gz.sha256
+tar -xzf lw.PPOCR.Inference-v1.3.0-linux-x64-openvino-cpu.tar.gz
+cd lw.PPOCR.Inference-v1.3.0-linux-x64-openvino-cpu
 ```
 
 OpenVINO 2025.2.0 官方文件仓库仍提供 Ubuntu 20.04 x64 专用归档。CI 使用 Ubuntu 20.04 容器和 GCC 9.4 构建，以降低在 Ubuntu 20.04/22.04 上的 glibc 兼容风险。较新的 2025.4 官方归档实际只提供 Ubuntu 22/24，因此本项目不会把 Ubuntu 22 构建误标为 Ubuntu 20 兼容包。
@@ -143,7 +143,7 @@ curl -X POST http://127.0.0.1:8787/api/recognize \
 | 字段 | 当前值 | 说明 |
 |---|---|---|
 | `backend` | `openvino` | 选择独立 OpenVINO Runtime |
-| `backend_options.device` | `CPU` | 当前预览包只允许 CPU，大小写不敏感 |
+| `backend_options.device` | `CPU` | 当前正式包只允许 CPU，大小写不敏感 |
 | `device_id` | `0` | CPU 模式忽略该值，为 ABI 统一保留 |
 | `enable_classifier` | `true` | 启用 0/180 度文字方向分类 |
 | `worker_threads` | `4` | HTTP 请求工作线程数 |
@@ -200,4 +200,4 @@ OpenCV 与 OpenVINO 均使用 GitHub Actions cache。缓存命中时不会重新
 
 ## English summary
 
-The Linux OpenVINO preview targets Ubuntu 20.04 x86_64 and bundles the official OpenVINO 2025.2.0 CPU runtime, ONNX frontend, oneTBB, minimal OpenCV libraries, PP-OCR models, the HTTP host, browser page, checksum verifier, and systemd scripts. Verify the archive and package before editing configuration, run `sudo ./install-deps-ubuntu.sh`, then use `./run-http-service.sh`. The package intentionally accepts only `backend_options.device=CPU`; OpenVINO GPU remains disabled until a separate correctness and stress-test pass is complete. For LAN access, bind to `0.0.0.0`, configure a strong API Key, send it through `X-API-Key`, and restrict the firewall to trusted networks.
+The Linux OpenVINO v1.3.0 release targets Ubuntu 20.04 x86_64 and bundles the official OpenVINO 2025.2.0 CPU runtime, ONNX frontend, oneTBB, minimal OpenCV libraries, PP-OCR models, the HTTP host, browser page, checksum verifier, and systemd scripts. Verify the archive and package before editing configuration, run `sudo ./install-deps-ubuntu.sh`, then use `./run-http-service.sh`. The package intentionally accepts only `backend_options.device=CPU`; OpenVINO GPU remains disabled until a separate correctness and stress-test pass is complete. For LAN access, bind to `0.0.0.0`, configure a strong API Key, send it through `X-API-Key`, and restrict the firewall to trusted networks.

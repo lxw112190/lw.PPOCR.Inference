@@ -42,8 +42,8 @@
 
 | OS | 设备 | ONNX Runtime | CUDA | 验证版本 | 状态 |
 |---|---|---|---|---|---|
-| Windows 10 22H2 | CPU | 1.26.0 GPU 包的 CPU EP | 不使用 | v1.3.0-preview.1 | ✅ 本地源码回归 |
-| Ubuntu 20.04 x64 | CPU | 1.26.0 CPU 官方包 | 不使用 | v1.3.0-preview.1 | CI 待运行 |
+| Windows 10 22H2 | CPU | 1.26.0 GPU 包的 CPU EP | 不使用 | v1.3.0 | ✅ 本地源码回归 |
+| Ubuntu 20.04 x64 | CPU | 1.26.0 CPU 官方包 | 不使用 | v1.3.0 | ✅ CI + 虚拟机 |
 | Ubuntu 20.04 x64 | NVIDIA GPU | 1.26.0 GPU 官方包 | CUDA 12 / 13 对应包 | v1.3.0 | 实机待验证 |
 
 **约束：**
@@ -60,13 +60,13 @@
 |---|---|---|---|---|
 | Windows 10 22H2 | AMD Ryzen 7 7735H | 2026.2.0 (21903) | v0.2.0 | ✅ |
 | Windows 11 | — | 2026.2.0 | — | Planned |
-| Ubuntu 20.04 x64 | x86-64 CPU | 2025.2.0 Ubuntu 20.04 官方归档 | v1.3.0-preview.1 | CI 待运行 |
+| Ubuntu 20.04 x64 | x86-64 CPU | 2025.2.0 Ubuntu 20.04 官方归档 | v1.3.0 | ✅ CI + 虚拟机 |
 
 **已知限制:**
 - **禁止 GPU。** OpenCL mapping failure (`clEnqueueMapBuffer: CL_INVALID_VALUE`) 已复现，稳定版本中 GPU 选择会被拒绝。
 - Recognition concurrency 上限为 8。
 - 曾出现 CPU GroupConvolution `can't alloc`，需继续做长循环验证。
-- Linux 预览包自包含 OpenVINO、oneTBB、ONNX frontend 和最小 OpenCV 共享库，当前同样只允许 `CPU`。
+- Linux 正式包自包含 OpenVINO、oneTBB、ONNX frontend 和最小 OpenCV 共享库，当前只允许 `CPU`。
 
 ---
 

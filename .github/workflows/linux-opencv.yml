@@ -12,6 +12,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  PACKAGE_VERSION: 1.3.0
+
 jobs:
   ubuntu-20-04:
     name: Ubuntu 20.04 x64 build, test, package
@@ -136,17 +139,19 @@ jobs:
       - name: Package Linux x64 distribution
         run: >-
           bash scripts/package-linux-x64.sh
-          build/ci-linux dist/releases/v1.2.0 1.2.0
+          build/ci-linux
+          "dist/releases/v${PACKAGE_VERSION}"
+          "${PACKAGE_VERSION}"
 
       - name: Verify packaged HTTP service
         run: >-
           python3 scripts/http-service-smoke.py
           --package-dir
-          dist/releases/v1.2.0/staging-linux-x64/lw.PPOCR.Inference-v1.2.0-linux-x64-opencv
+          "dist/releases/v${PACKAGE_VERSION}/staging-linux-x64/lw.PPOCR.Inference-v${PACKAGE_VERSION}-linux-x64-opencv"
 
       - name: Inspect ELF dependencies
         run: |
-          PACKAGE=dist/releases/v1.2.0/staging-linux-x64/lw.PPOCR.Inference-v1.2.0-linux-x64-opencv
+          PACKAGE="dist/releases/v${PACKAGE_VERSION}/staging-linux-x64/lw.PPOCR.Inference-v${PACKAGE_VERSION}-linux-x64-opencv"
           ldd "$PACKAGE/liblw.PPOCR.so.1"
           ldd "$PACKAGE/runtimes/linux-x64/opencv/liblw.PPOCR.Runtime.OpenCVDNN.so"
           ldd "$PACKAGE/lw-ppocr-http-service"
@@ -154,9 +159,9 @@ jobs:
       - name: Upload Linux package
         uses: actions/upload-artifact@v4
         with:
-          name: lw.PPOCR.Inference-v1.2.0-linux-x64-opencv
+          name: lw.PPOCR.Inference-v${{ env.PACKAGE_VERSION }}-linux-x64-opencv
           path: |
-            dist/releases/v1.2.0/lw.PPOCR.Inference-v1.2.0-linux-x64-opencv.tar.gz
-            dist/releases/v1.2.0/lw.PPOCR.Inference-v1.2.0-linux-x64-opencv.tar.gz.sha256
+            dist/releases/v${{ env.PACKAGE_VERSION }}/lw.PPOCR.Inference-v${{ env.PACKAGE_VERSION }}-linux-x64-opencv.tar.gz
+            dist/releases/v${{ env.PACKAGE_VERSION }}/lw.PPOCR.Inference-v${{ env.PACKAGE_VERSION }}-linux-x64-opencv.tar.gz.sha256
           if-no-files-found: error
           retention-days: 14

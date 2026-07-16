@@ -1,16 +1,16 @@
-# Linux OpenCV DNN 部署（v1.2.0）
+# Linux OpenCV DNN 部署（v1.3.0）
 
-v1.2.0 Linux OpenCV DNN 包面向 **Ubuntu 20.04 x86_64**，使用 OpenCV 5.0 DNN CPU 后端。发布包已经包含 Loader、OpenCV Runtime、OpenCV 共享库、PP-OCRv6 tiny ONNX 模型、字典、HTTP 服务、测试网页和 systemd 脚本，不需要另外安装 OpenCV 或复制仓库文件。
+v1.3.0 Linux OpenCV DNN 包面向 **Ubuntu 20.04 x86_64**，使用 OpenCV 5.0 DNN CPU 后端。发布包已经包含 Loader、OpenCV Runtime、OpenCV 共享库、PP-OCRv6 tiny ONNX 模型、字典、HTTP 服务、测试网页和 systemd 脚本，不需要另外安装 OpenCV 或复制仓库文件。
 
-> Windows v1.1.0 包不能通过替换几个文件转换成 Linux 包。Linux 用户应以 v1.2.0 Linux 完整包作为首个基线包。
+> Windows 包不能通过替换几个文件转换成 Linux 包。Linux 用户首次部署应下载 v1.3.0 对应后端的完整包。
 
 ## 1. 获取并校验发布包
 
 GitHub Release 应下载以下两个文件：
 
 ```text
-lw.PPOCR.Inference-v1.2.0-linux-x64-opencv.tar.gz
-lw.PPOCR.Inference-v1.2.0-linux-x64-opencv.tar.gz.sha256
+lw.PPOCR.Inference-v1.3.0-linux-x64-opencv.tar.gz
+lw.PPOCR.Inference-v1.3.0-linux-x64-opencv.tar.gz.sha256
 ```
 
 从 GitHub Actions 下载的 Artifact 是一个同名 `.zip`，ZIP 内部才是上面的 `tar.gz` 和 `.sha256`。先解开外层 ZIP，再把这两个文件原样传到 Linux；不要在 Windows 解开 `tar.gz` 后重新压缩，以免丢失脚本的 Linux 可执行权限。
@@ -18,9 +18,9 @@ lw.PPOCR.Inference-v1.2.0-linux-x64-opencv.tar.gz.sha256
 在 Ubuntu 中执行：
 
 ```bash
-sha256sum -c lw.PPOCR.Inference-v1.2.0-linux-x64-opencv.tar.gz.sha256
-tar -xzf lw.PPOCR.Inference-v1.2.0-linux-x64-opencv.tar.gz
-cd lw.PPOCR.Inference-v1.2.0-linux-x64-opencv
+sha256sum -c lw.PPOCR.Inference-v1.3.0-linux-x64-opencv.tar.gz.sha256
+tar -xzf lw.PPOCR.Inference-v1.3.0-linux-x64-opencv.tar.gz
+cd lw.PPOCR.Inference-v1.3.0-linux-x64-opencv
 ```
 
 若文件经过不保留权限的工具传输，可恢复脚本权限：
@@ -133,7 +133,7 @@ Base64 可以是纯 Base64，也可以带 `data:image/...;base64,` 前缀。
 | --- | --- | --- |
 | `listen_host` | `127.0.0.1` | 监听地址；局域网访问可改为 `0.0.0.0` |
 | `port` | `8787` | HTTP 端口 |
-| `backend` | `opencv` | Linux v1.2.0 包固定使用 OpenCV DNN |
+| `backend` | `opencv` | Linux v1.3.0 OpenCV 包固定使用 OpenCV DNN |
 | `runtime_root` | `runtimes/linux-x64` | Runtime 根目录 |
 | `model_manifest` | `models/ppocrv6-tiny/model.json` | 模型清单 |
 | `web_root` | `www` | 测试网页目录 |
@@ -272,4 +272,4 @@ ctest --test-dir build/linux-release --output-on-failure
 
 ## English summary
 
-The v1.2.0 Linux package targets Ubuntu 20.04 x86_64 and bundles the OpenCV 5.0 CPU runtime, ONNX models, HTTP host, browser test page, and systemd scripts. Verify the archive with `sha256sum`, run `sudo ./install-deps-ubuntu.sh`, execute `./verify-linux-package.sh` before starting another service on port 8787, and use `./run-http-service.sh` for foreground testing. Install the validated directory under `/opt/lw-ppocr` with `sudo ./install-systemd.sh`. For LAN access, set `listen_host` to `0.0.0.0`, configure a non-empty `api_key`, send it in `X-API-Key`, and restrict the port to trusted networks.
+The v1.3.0 Linux package targets Ubuntu 20.04 x86_64 and bundles the OpenCV 5.0 CPU runtime, ONNX models, HTTP host, browser test page, and systemd scripts. Verify the archive with `sha256sum`, run `sudo ./install-deps-ubuntu.sh`, execute `./verify-linux-package.sh` before starting another service on port 8787, and use `./run-http-service.sh` for foreground testing. Install the validated directory under `/opt/lw-ppocr` with `sudo ./install-systemd.sh`. For LAN access, set `listen_host` to `0.0.0.0`, configure a non-empty `api_key`, send it in `X-API-Key`, and restrict the port to trusted networks.
