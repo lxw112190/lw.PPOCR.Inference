@@ -6,16 +6,19 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import os
 import socket
 import subprocess
 import tempfile
 import time
 import urllib.error
 import urllib.request
+import sys
 from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+SMOKE_API_KEY = "lw-ppocr-smoke-secret"
 
 
 def free_port() -> int:
@@ -24,12 +27,19 @@ def free_port() -> int:
         return int(server.getsockname()[1])
 
 
-def request_json(url: str, payload: object | None = None) -> object:
+def request_json(
+    url: str,
+    payload: object | None = None,
+    api_key: str | None = None,
+) -> object:
     data = None if payload is None else json.dumps(payload).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["X-API-Key"] = api_key
     request = urllib.request.Request(
         url,
         data=data,
-        headers={"Content-Type": "application/json"},
+        headers=headers,
         method="GET" if data is None else "POST",
     )
     with urllib.request.urlopen(request, timeout=30) as response:
@@ -44,11 +54,17 @@ def main() -> int:
     arguments = parser.parse_args()
     package_dir = arguments.package_dir.resolve() if arguments.package_dir else None
     binary_dir = (arguments.binary_dir or package_dir).resolve()
-    executable = binary_dir / "lw.PPOCR.HttpService.exe"
+    is_windows = sys.platform == "win32"
+    executable = binary_dir / (
+        "lw.PPOCR.HttpService.exe" if is_windows else "lw-ppocr-http-service"
+    )
     image = (package_dir / "models" / "ppocrv6-tiny" / "sample.jpg"
         if package_dir else PROJECT_ROOT / "models" / "ppocrv6-tiny" / "sample.jpg")
     required_paths = [executable, image]
-    runtime = binary_dir / "lw.PPOCR.Runtime.Stub.dll"
+    runtime = binary_dir / (
+        "lw.PPOCR.Runtime.Stub.dll"
+        if is_windows else "liblw.PPOCR.Runtime.Stub.so"
+    )
     if package_dir is None:
         required_paths.append(runtime)
     for path in required_paths:
@@ -65,12 +81,15 @@ def main() -> int:
             config.update({
                 "listen_host": "127.0.0.1",
                 "port": port,
-                "runtime_root": str(package_dir / "runtimes" / "win-x64"),
+                "runtime_root": str(
+                    package_dir / "runtimes" /
+                    ("win-x64" if is_windows else "linux-x64")
+                ),
                 "model_manifest": str(
                     package_dir / "models" / "ppocrv6-tiny" / "model.json"
                 ),
                 "web_root": str(package_dir / "www"),
-                "api_key": "",
+                "api_key": SMOKE_API_KEY,
             })
         else:
             config = {
@@ -85,8 +104,19 @@ def main() -> int:
                 "worker_threads": 2,
                 "max_request_bytes": 20 * 1024 * 1024,
                 "max_image_pixels": 40_000_000,
+                "api_key": SMOKE_API_KEY,
             }
         config_path.write_text(json.dumps(config), encoding="utf-8")
+        environment = os.environ.copy()
+        if not is_windows:
+            library_paths = [str(binary_dir)]
+            if package_dir:
+                library_paths.append(str(
+                    package_dir / "runtimes" / "linux-x64" / "opencv"
+                ))
+            if environment.get("LD_LIBRARY_PATH"):
+                library_paths.append(environment["LD_LIBRARY_PATH"])
+            environment["LD_LIBRARY_PATH"] = os.pathsep.join(library_paths)
         process = subprocess.Popen(
             [str(executable), "--console", "--config", str(config_path)],
             cwd=binary_dir,
@@ -95,7 +125,9 @@ def main() -> int:
             text=True,
             encoding="utf-8",
             errors="replace",
+            env=environment,
         )
+        completed = False
         try:
             health = None
             deadline = time.monotonic() + 30
@@ -117,9 +149,19 @@ def main() -> int:
                     raise RuntimeError("HTTP test page is missing or invalid")
 
             encoded = base64.b64encode(image.read_bytes()).decode("ascii")
+            try:
+                request_json(
+                    f"http://127.0.0.1:{port}/api/ocr",
+                    {"image_base64": encoded},
+                )
+                raise RuntimeError("OCR request without API Key was accepted")
+            except urllib.error.HTTPError as error:
+                if error.code != 401:
+                    raise
             result = request_json(
                 f"http://127.0.0.1:{port}/api/ocr",
                 {"image_base64": encoded},
+                api_key=SMOKE_API_KEY,
             )
             if not isinstance(result, dict) or not result.get("ok"):
                 raise RuntimeError(f"OCR request failed: {result}")
@@ -136,6 +178,7 @@ def main() -> int:
             recognition = request_json(
                 f"http://127.0.0.1:{port}/api/recognize",
                 {"images_base64": [encoded, encoded]},
+                api_key=SMOKE_API_KEY,
             )
             items = recognition.get("result") if isinstance(recognition, dict) else None
             if (not isinstance(recognition, dict) or not recognition.get("ok") or
@@ -151,6 +194,7 @@ def main() -> int:
                 f"image={result.get('image')}, regions={len(regions)}, "
                 f"recognition_items={len(items)}"
             )
+            completed = True
         finally:
             process.terminate()
             try:
@@ -158,6 +202,30 @@ def main() -> int:
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait(timeout=5)
+            service_output = process.stdout.read() if process.stdout else ""
+            if completed:
+                required_startup_text = (
+                    "Author / 作者: 天天代码码天天",
+                    "QQ: 819069052",
+                    "Startup parameters / 启动参数",
+                    "Request parameters / 请求参数",
+                    "api_key:",
+                )
+                missing = [
+                    value for value in required_startup_text
+                    if value not in service_output
+                ]
+                if missing:
+                    raise RuntimeError(
+                        "HTTP startup information is incomplete: "
+                        + ", ".join(missing)
+                        + "\nService output:\n"
+                        + service_output
+                    )
+                if SMOKE_API_KEY in service_output:
+                    raise RuntimeError(
+                        "HTTP startup output leaked the configured API Key"
+                    )
     return 0
 
 

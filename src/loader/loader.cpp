@@ -2,7 +2,11 @@
 #include <lw/ppocr/core/config_validation.hpp>
 #include <lw/ppocr/runtime_api.h>
 
+#if defined(_WIN32)
 #include <windows.h>
+#else
+#include <dlfcn.h>
+#endif
 
 #include <algorithm>
 #include <cstring>
@@ -12,10 +16,15 @@
 #include <string>
 #include <vector>
 
+#if defined(_WIN32)
 extern "C" IMAGE_DOS_HEADER __ImageBase;
+using NativeModule = HMODULE;
+#else
+using NativeModule = void*;
+#endif
 
 struct lw_ppocr_engine {
-    HMODULE module = nullptr;
+    NativeModule module = nullptr;
     const lw_ppocr_runtime_api* runtime_api = nullptr;
     void* runtime_handle = nullptr;
 };
@@ -45,10 +54,11 @@ uint64_t CopyText(const std::string& text, char* buffer, uint64_t capacity) {
     return required;
 }
 
-std::wstring Utf8ToWide(const char* value) {
+std::filesystem::path PathFromUtf8(const char* value) {
     if (value == nullptr || value[0] == '\0') {
         return {};
     }
+#if defined(_WIN32)
 
     const int length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value, -1,
         nullptr, 0);
@@ -60,10 +70,14 @@ std::wstring Utf8ToWide(const char* value) {
     MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value, -1,
         result.data(), length);
     result.resize(result.size() - 1);
-    return result;
+    return std::filesystem::path(result);
+#else
+    return std::filesystem::u8path(value);
+#endif
 }
 
 std::filesystem::path LoaderDirectory() {
+#if defined(_WIN32)
     std::vector<wchar_t> buffer(512);
     for (;;) {
         const DWORD length = GetModuleFileNameW(
@@ -77,19 +91,28 @@ std::filesystem::path LoaderDirectory() {
         }
         buffer.resize(buffer.size() * 2);
     }
+#else
+    Dl_info information{};
+    if (dladdr(reinterpret_cast<const void*>(&lw_ppocr_get_version),
+            &information) == 0 || information.dli_fname == nullptr) {
+        throw std::runtime_error("dladdr failed while locating liblw.PPOCR");
+    }
+    return std::filesystem::absolute(
+        std::filesystem::u8path(information.dli_fname)).parent_path();
+#endif
 }
 
 std::filesystem::path RuntimeLibraryPath(const lw_ppocr_config& config) {
     if (config.runtime_library_utf8 != nullptr &&
         config.runtime_library_utf8[0] != '\0') {
-        std::filesystem::path explicit_path(Utf8ToWide(config.runtime_library_utf8));
+        std::filesystem::path explicit_path(PathFromUtf8(config.runtime_library_utf8));
         if (explicit_path.is_relative()) {
             explicit_path = std::filesystem::absolute(explicit_path);
         }
         return explicit_path.lexically_normal();
     }
 
-    const wchar_t* library_name = lw::ppocr::core::BackendLibraryName(config.backend);
+    const char* library_name = lw::ppocr::core::BackendLibraryName(config.backend);
     const char* backend_directory = lw::ppocr::core::BackendDirectory(config.backend);
     if (library_name == nullptr || backend_directory == nullptr) {
         throw std::runtime_error("no Runtime library is registered for this backend");
@@ -97,14 +120,20 @@ std::filesystem::path RuntimeLibraryPath(const lw_ppocr_config& config) {
 
     std::filesystem::path root;
     if (config.runtime_root_utf8 != nullptr && config.runtime_root_utf8[0] != '\0') {
-        root = std::filesystem::path(Utf8ToWide(config.runtime_root_utf8));
+        root = PathFromUtf8(config.runtime_root_utf8);
     } else {
+#if defined(_WIN32)
         root = LoaderDirectory() / L"runtimes" / L"win-x64";
+#else
+        root = LoaderDirectory() / "runtimes" / "linux-x64";
+#endif
     }
 
-    return (root / Utf8ToWide(backend_directory) / library_name).lexically_normal();
+    return (root / std::filesystem::u8path(backend_directory) /
+        std::filesystem::u8path(library_name)).lexically_normal();
 }
 
+#if defined(_WIN32)
 std::string WindowsErrorMessage(DWORD error_code) {
     wchar_t* wide_message = nullptr;
     const DWORD length = FormatMessageW(
@@ -128,6 +157,51 @@ std::string WindowsErrorMessage(DWORD error_code) {
         result.pop_back();
     }
     return result;
+}
+#endif
+
+std::string PathToUtf8(const std::filesystem::path& path) {
+    return path.u8string();
+}
+
+NativeModule OpenRuntimeLibrary(
+    const std::filesystem::path& path, std::string& error) {
+#if defined(_WIN32)
+    NativeModule module = LoadLibraryExW(path.c_str(), nullptr,
+        LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+    if (module == nullptr) {
+        error = WindowsErrorMessage(GetLastError());
+    }
+    return module;
+#else
+    dlerror();
+    NativeModule module = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
+    if (module == nullptr) {
+        const char* message = dlerror();
+        error = message == nullptr ? "dlopen failed" : message;
+    }
+    return module;
+#endif
+}
+
+void* FindRuntimeSymbol(NativeModule module, const char* name) {
+#if defined(_WIN32)
+    return reinterpret_cast<void*>(GetProcAddress(module, name));
+#else
+    dlerror();
+    return dlsym(module, name);
+#endif
+}
+
+void CloseRuntimeLibrary(NativeModule module) noexcept {
+    if (module == nullptr) {
+        return;
+    }
+#if defined(_WIN32)
+    FreeLibrary(module);
+#else
+    dlclose(module);
+#endif
 }
 
 std::string RuntimeLastError(lw_ppocr_handle handle) {
@@ -188,7 +262,7 @@ lw_ppocr_status LW_PPOCR_CALL lw_ppocr_get_version(lw_ppocr_version* version) {
     version->minor = LW_PPOCR_VERSION_MINOR;
     version->patch = LW_PPOCR_VERSION_PATCH;
     version->product_name_utf8 = "lw.PPOCR.Inference";
-    version->version_utf8 = "1.1.0";
+    version->version_utf8 = "1.2.0";
     ClearLastError();
     return LW_PPOCR_STATUS_OK;
 }
@@ -212,18 +286,18 @@ lw_ppocr_status LW_PPOCR_CALL lw_ppocr_create(
 
     try {
         const std::filesystem::path runtime_path = RuntimeLibraryPath(*config);
-        HMODULE module = LoadLibraryExW(runtime_path.c_str(), nullptr,
-            LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+        std::string load_error;
+        NativeModule module = OpenRuntimeLibrary(runtime_path, load_error);
         if (module == nullptr) {
-            SetLastError("failed to load Runtime '" + runtime_path.u8string() +
-                "': " + WindowsErrorMessage(GetLastError()));
+            SetLastError("failed to load Runtime '" + PathToUtf8(runtime_path) +
+                "': " + load_error);
             return LW_PPOCR_STATUS_RUNTIME_NOT_FOUND;
         }
 
         const auto get_api = reinterpret_cast<lw_ppocr_runtime_get_api_fn>(
-            GetProcAddress(module, LW_PPOCR_RUNTIME_ENTRY_NAME));
+            FindRuntimeSymbol(module, LW_PPOCR_RUNTIME_ENTRY_NAME));
         if (get_api == nullptr) {
-            FreeLibrary(module);
+            CloseRuntimeLibrary(module);
             SetLastError("Runtime does not export " LW_PPOCR_RUNTIME_ENTRY_NAME);
             return LW_PPOCR_STATUS_RUNTIME_INCOMPATIBLE;
         }
@@ -232,14 +306,14 @@ lw_ppocr_status LW_PPOCR_CALL lw_ppocr_create(
         const lw_ppocr_status api_status = get_api(
             LW_PPOCR_RUNTIME_API_VERSION, &runtime_api);
         if (api_status != LW_PPOCR_STATUS_OK || !RuntimeApiIsComplete(runtime_api)) {
-            FreeLibrary(module);
+            CloseRuntimeLibrary(module);
             SetLastError("Runtime API is incomplete or incompatible");
             return LW_PPOCR_STATUS_RUNTIME_INCOMPATIBLE;
         }
 
         auto* engine = new (std::nothrow) lw_ppocr_engine();
         if (engine == nullptr) {
-            FreeLibrary(module);
+            CloseRuntimeLibrary(module);
             SetLastError("failed to allocate loader engine");
             return LW_PPOCR_STATUS_OUT_OF_MEMORY;
         }
@@ -253,7 +327,7 @@ lw_ppocr_status LW_PPOCR_CALL lw_ppocr_create(
             if (engine->runtime_handle != nullptr) {
                 runtime_api->destroy(&engine->runtime_handle);
             }
-            FreeLibrary(module);
+            CloseRuntimeLibrary(module);
             delete engine;
             SetLastError(runtime_error.empty() ? "Runtime failed to create an engine" :
                 runtime_error);
@@ -459,7 +533,7 @@ void LW_PPOCR_CALL lw_ppocr_destroy(lw_ppocr_handle* handle) {
         engine->runtime_api->destroy(&engine->runtime_handle);
     }
     if (engine->module != nullptr) {
-        FreeLibrary(engine->module);
+        CloseRuntimeLibrary(engine->module);
     }
     delete engine;
     ClearLastError();

@@ -5,11 +5,10 @@
 #include <json.hpp>
 #include <lw/ppocr/ppocr_api.h>
 
-#include <windows.h>
-#include <winsvc.h>
-
 #include <atomic>
 #include <algorithm>
+#include <csignal>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -20,6 +19,14 @@
 #include <chrono>
 #include <iomanip>
 #include <vector>
+
+#if defined(_WIN32)
+#include <windows.h>
+#include <winsvc.h>
+#else
+#include <limits.h>
+#include <unistd.h>
+#endif
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
@@ -41,15 +48,16 @@ struct ServiceConfig {
     uint64_t max_image_pixels = 40u * 1000u * 1000u;
     size_t worker_threads = 4;
     std::string api_key;
-    std::wstring service_name = L"lw.PPOCR.HttpService";
-    std::wstring service_display_name = L"lw.PPOCR HTTP OCR Service";
+    std::string service_name = "lw.PPOCR.HttpService";
+    std::string service_display_name = "lw.PPOCR HTTP OCR Service";
 };
 
 std::atomic<httplib::Server*> g_active_server{nullptr};
+fs::path g_config_path;
+#if defined(_WIN32)
 SERVICE_STATUS_HANDLE g_service_status_handle = nullptr;
 SERVICE_STATUS g_service_status{};
 std::wstring g_service_name;
-fs::path g_config_path;
 
 std::wstring Utf8ToWide(const std::string& value) {
     if (value.empty()) {
@@ -65,20 +73,10 @@ std::wstring Utf8ToWide(const std::string& value) {
         static_cast<int>(value.size()), result.data(), length);
     return result;
 }
-
-std::string WideToUtf8(const std::wstring& value) {
-    if (value.empty()) {
-        return {};
-    }
-    const int length = WideCharToMultiByte(CP_UTF8, 0, value.data(),
-        static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
-    std::string result(static_cast<size_t>(length), '\0');
-    WideCharToMultiByte(CP_UTF8, 0, value.data(),
-        static_cast<int>(value.size()), result.data(), length, nullptr, nullptr);
-    return result;
-}
+#endif
 
 fs::path ExecutablePath() {
+#if defined(_WIN32)
     std::wstring buffer(32768, L'\0');
     const DWORD length = GetModuleFileNameW(nullptr, buffer.data(),
         static_cast<DWORD>(buffer.size()));
@@ -87,6 +85,14 @@ fs::path ExecutablePath() {
     }
     buffer.resize(length);
     return fs::path(buffer);
+#else
+    std::vector<char> buffer(PATH_MAX + 1u, '\0');
+    const ssize_t length = readlink("/proc/self/exe", buffer.data(), PATH_MAX);
+    if (length <= 0 || length >= PATH_MAX) {
+        throw std::runtime_error("unable to determine executable path");
+    }
+    return fs::u8path(std::string(buffer.data(), static_cast<size_t>(length)));
+#endif
 }
 
 fs::path ResolvePath(const fs::path& base, const std::string& configured) {
@@ -124,8 +130,13 @@ ServiceConfig LoadConfig(const fs::path& path) {
     config.worker_threads =
         document.value("worker_threads", config.worker_threads);
     config.api_key = document.value("api_key", std::string{});
+#if defined(_WIN32)
+    constexpr const char* default_runtime_root = "runtimes/win-x64";
+#else
+    constexpr const char* default_runtime_root = "runtimes/linux-x64";
+#endif
     config.runtime_root = ResolvePath(base,
-        document.value("runtime_root", "runtimes/win-x64"));
+        document.value("runtime_root", default_runtime_root));
     const std::string runtime_library =
         document.value("runtime_library", std::string{});
     if (!runtime_library.empty()) {
@@ -141,11 +152,11 @@ ServiceConfig LoadConfig(const fs::path& path) {
     if (document.contains("backend_options")) {
         config.backend_options_json = document["backend_options"].dump();
     }
-    config.service_name = Utf8ToWide(document.value("service_name",
-        "lw.PPOCR.HttpService." + config.backend));
-    config.service_display_name = Utf8ToWide(document.value(
+    config.service_name = document.value("service_name",
+        "lw.PPOCR.HttpService." + config.backend);
+    config.service_display_name = document.value(
         "service_display_name",
-        "lw.PPOCR HTTP OCR Service (" + config.backend + ")"));
+        "lw.PPOCR HTTP OCR Service (" + config.backend + ")");
 
     if (config.port < 1 || config.port > 65535) {
         throw std::runtime_error("port must be between 1 and 65535");
@@ -393,7 +404,11 @@ void AppendServiceLog(const std::string& message) {
         const auto now = std::chrono::system_clock::to_time_t(
             std::chrono::system_clock::now());
         std::tm local{};
+#if defined(_WIN32)
         localtime_s(&local, &now);
+#else
+        localtime_r(&now, &local);
+#endif
         output << std::put_time(&local, "%Y-%m-%d %H:%M:%S")
                << " " << message << '\n';
     } catch (...) {
@@ -427,7 +442,57 @@ bool Authorized(const ServiceConfig& config,
     return false;
 }
 
+void PrintStartupInfo(const ServiceConfig& config, bool service_mode) {
+    std::ostringstream startup;
+    startup
+        << "============================================================\n"
+        << "lw.PPOCR.Inference HTTP Service v1.2.0\n"
+        << "Author / 作者: 天天代码码天天\n"
+        << "QQ: 819069052\n"
+        << "============================================================\n"
+        << "Startup parameters / 启动参数\n"
+        << "  config_file: " << g_config_path.u8string() << '\n'
+        << "  listen_host: " << config.listen_host << '\n'
+        << "  port: " << config.port << '\n'
+        << "  backend: " << config.backend << '\n'
+        << "  runtime_root: " << config.runtime_root.u8string() << '\n'
+        << "  runtime_library: "
+        << (config.runtime_library.empty() ? "<auto>" :
+            config.runtime_library.u8string()) << '\n'
+        << "  model_manifest: " << config.model_manifest << '\n'
+        << "  web_root: " << config.web_root.u8string() << '\n'
+        << "  device_id: " << config.device_id << '\n'
+        << "  enable_classifier: "
+        << (config.enable_classifier ? "true" : "false") << '\n'
+        << "  backend_options: "
+        << (config.backend_options_json.empty() ? "<none>" :
+            config.backend_options_json) << '\n'
+        << "  worker_threads: " << config.worker_threads << '\n'
+        << "  max_request_bytes: " << config.max_request_bytes << '\n'
+        << "  max_image_pixels: " << config.max_image_pixels << '\n'
+        << "  api_key: "
+        << (config.api_key.empty() ? "disabled / 未启用" :
+            "configured / 已配置（value hidden / 明文已隐藏）") << '\n'
+        << "  service_name: " << config.service_name << '\n'
+        << "  service_display_name: " << config.service_display_name << '\n'
+        << "Request parameters / 请求参数\n"
+        << "  POST /api/ocr: {\"image_base64\":\"...\"}\n"
+        << "  POST /api/recognize: {\"image_base64\":\"...\"}\n"
+        << "  POST /api/recognize batch: {\"images_base64\":[\"...\"]}\n"
+        << "  authentication: X-API-Key header when api_key is configured\n"
+        << "============================================================\n";
+    std::cout << startup.str() << std::flush;
+#if defined(_WIN32)
+    if (service_mode) {
+        AppendServiceLog(startup.str());
+    }
+#else
+    (void)service_mode;
+#endif
+}
+
 int RunHttpServer(const ServiceConfig& config, bool service_mode) {
+    PrintStartupInfo(config, service_mode);
     OcrEngine engine(config);
     const std::string index_html = ReadTextFile(config.web_root / "index.html");
 
@@ -448,7 +513,10 @@ int RunHttpServer(const ServiceConfig& config, bool service_mode) {
             {"ok", true},
             {"status", "ready"},
             {"backend", config.backend},
-            {"backend_name", engine.backend_name()}
+            {"backend_name", engine.backend_name()},
+            {"api_key_required", !config.api_key.empty()},
+            {"max_request_bytes", config.max_request_bytes},
+            {"max_image_pixels", config.max_image_pixels}
         });
     });
     server.Post("/api/ocr", [&config, &engine](const httplib::Request& request,
@@ -476,7 +544,7 @@ int RunHttpServer(const ServiceConfig& config, bool service_mode) {
             }
 
             lw::ppocr::http::DecodedImage decoded;
-            if (!lw::ppocr::http::DecodeImageWithWic(encoded,
+            if (!lw::ppocr::http::DecodeImage(encoded,
                     config.max_image_pixels, decoded, error)) {
                 SetJson(response, {{"ok", false}, {"error", error}}, 400);
                 return;
@@ -556,7 +624,7 @@ int RunHttpServer(const ServiceConfig& config, bool service_mode) {
                     return;
                 }
                 lw::ppocr::http::DecodedImage decoded;
-                if (!lw::ppocr::http::DecodeImageWithWic(encoded,
+                if (!lw::ppocr::http::DecodeImage(encoded,
                         config.max_image_pixels, decoded, error)) {
                     SetJson(response, {{"ok", false}, {"error",
                         "image " + std::to_string(index) + ": " + error}}, 400);
@@ -600,6 +668,7 @@ int RunHttpServer(const ServiceConfig& config, bool service_mode) {
         std::cout << "lw.PPOCR HTTP service ready: http://"
                   << config.listen_host << ':' << config.port
                   << " (" << engine.backend_name() << ")\n";
+#if defined(_WIN32)
         if (service_mode && g_service_status_handle != nullptr) {
             g_service_status.dwCurrentState = SERVICE_RUNNING;
             g_service_status.dwControlsAccepted = SERVICE_ACCEPT_STOP |
@@ -607,6 +676,9 @@ int RunHttpServer(const ServiceConfig& config, bool service_mode) {
             g_service_status.dwWaitHint = 0;
             SetServiceStatus(g_service_status_handle, &g_service_status);
         }
+#else
+        (void)service_mode;
+#endif
     });
 
     const bool listened = server.listen(config.listen_host, config.port);
@@ -617,6 +689,7 @@ int RunHttpServer(const ServiceConfig& config, bool service_mode) {
     return 0;
 }
 
+#if defined(_WIN32)
 void ReportServiceStopped(DWORD exit_code) {
     if (g_service_status_handle == nullptr) {
         return;
@@ -696,8 +769,11 @@ void InstallService(const ServiceConfig& config, const fs::path& config_path) {
     }
     const std::wstring command = L"\"" + ExecutablePath().wstring() +
         L"\" --service --config \"" + fs::absolute(config_path).wstring() + L"\"";
-    ServiceHandle service(CreateServiceW(manager.get(), config.service_name.c_str(),
-        config.service_display_name.c_str(), SERVICE_ALL_ACCESS,
+    const std::wstring service_name = Utf8ToWide(config.service_name);
+    const std::wstring service_display_name =
+        Utf8ToWide(config.service_display_name);
+    ServiceHandle service(CreateServiceW(manager.get(), service_name.c_str(),
+        service_display_name.c_str(), SERVICE_ALL_ACCESS,
         SERVICE_WIN32_OWN_PROCESS, SERVICE_AUTO_START, SERVICE_ERROR_NORMAL,
         command.c_str(), nullptr, nullptr, nullptr, nullptr, nullptr));
     if (!service) {
@@ -718,7 +794,7 @@ void InstallService(const ServiceConfig& config, const fs::path& config_path) {
         GetLastError() != ERROR_SERVICE_ALREADY_RUNNING) {
         throw WindowsError("StartService");
     }
-    std::wcout << L"Installed and started service: " << config.service_name << L'\n';
+    std::wcout << L"Installed and started service: " << service_name << L'\n';
 }
 
 void StopServiceIfRunning(SC_HANDLE service) {
@@ -754,11 +830,12 @@ void UninstallService(const ServiceConfig& config) {
     if (!manager) {
         throw WindowsError("OpenSCManager");
     }
-    ServiceHandle service(OpenServiceW(manager.get(), config.service_name.c_str(),
+    const std::wstring service_name = Utf8ToWide(config.service_name);
+    ServiceHandle service(OpenServiceW(manager.get(), service_name.c_str(),
         SERVICE_STOP | SERVICE_QUERY_STATUS | DELETE));
     if (!service) {
         if (GetLastError() == ERROR_SERVICE_DOES_NOT_EXIST) {
-            std::wcout << L"Service is not installed: " << config.service_name << L'\n';
+            std::wcout << L"Service is not installed: " << service_name << L'\n';
             return;
         }
         throw WindowsError("OpenService");
@@ -767,10 +844,18 @@ void UninstallService(const ServiceConfig& config) {
     if (!DeleteService(service.get())) {
         throw WindowsError("DeleteService");
     }
-    std::wcout << L"Uninstalled service: " << config.service_name << L'\n';
+    std::wcout << L"Uninstalled service: " << service_name << L'\n';
 }
+#else
+void SignalHandler(int) {
+    if (httplib::Server* server = g_active_server.load()) {
+        server->stop();
+    }
+}
+#endif
 
 void PrintUsage() {
+#if defined(_WIN32)
     std::cout
         << "lw.PPOCR.HttpService [--console|--service|--install|--uninstall] "
            "[--config <path>]\n"
@@ -778,11 +863,20 @@ void PrintUsage() {
         << "  --service    Run under Windows Service Control Manager\n"
         << "  --install    Install and start an automatic Windows service (admin)\n"
         << "  --uninstall  Stop and remove the Windows service (admin)\n";
+#else
+    std::cout
+        << "lw-ppocr-http-service [--console] [--config <path>]\n"
+        << "  --console    Run in the foreground (default)\n"
+        << "Linux service installation is provided by install-systemd.sh.\n";
+#endif
 }
 
 }  // namespace
 
+#if defined(_WIN32)
 int wmain(int argc, wchar_t** argv) {
+    SetConsoleOutputCP(CP_UTF8);
+    SetConsoleCP(CP_UTF8);
     try {
         std::wstring mode = L"--console";
         g_config_path = ExecutablePath().parent_path() / L"http-service.json";
@@ -802,7 +896,7 @@ int wmain(int argc, wchar_t** argv) {
         }
 
         const ServiceConfig config = LoadConfig(g_config_path);
-        g_service_name = config.service_name;
+        g_service_name = Utf8ToWide(config.service_name);
         if (mode == L"--install") {
             InstallService(config, g_config_path);
             return 0;
@@ -829,3 +923,34 @@ int wmain(int argc, wchar_t** argv) {
         return 1;
     }
 }
+#else
+int main(int argc, char** argv) {
+    try {
+        g_config_path = ExecutablePath().parent_path() / "http-service.json";
+        for (int index = 1; index < argc; ++index) {
+            const std::string argument = argv[index];
+            if (argument == "--config" && index + 1 < argc) {
+                g_config_path = fs::absolute(fs::u8path(argv[++index]));
+            } else if (argument == "--console") {
+                continue;
+            } else if (argument == "--help" || argument == "-h") {
+                PrintUsage();
+                return 0;
+            } else if (argument == "--service" || argument == "--install" ||
+                       argument == "--uninstall") {
+                throw std::runtime_error(
+                    "Windows service options are unavailable on Linux; use the supplied systemd scripts");
+            } else {
+                throw std::runtime_error("unknown or incomplete command-line option");
+            }
+        }
+
+        std::signal(SIGINT, SignalHandler);
+        std::signal(SIGTERM, SignalHandler);
+        return RunHttpServer(LoadConfig(g_config_path), false);
+    } catch (const std::exception& exception) {
+        std::cerr << "lw.PPOCR HTTP service: " << exception.what() << '\n';
+        return 1;
+    }
+}
+#endif

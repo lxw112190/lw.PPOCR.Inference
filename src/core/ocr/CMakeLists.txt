@@ -13,8 +13,13 @@ target_include_directories(lw_ppocr_ocr_core
         ${CMAKE_SOURCE_DIR}/third_party/clipper
 )
 target_link_libraries(lw_ppocr_ocr_core PUBLIC ${OpenCV_LIBS})
-target_compile_definitions(lw_ppocr_ocr_core PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+if(WIN32)
+    target_compile_definitions(lw_ppocr_ocr_core PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+endif()
 
 if(MSVC)
     target_compile_options(lw_ppocr_ocr_core PRIVATE /W4 /permissive- /utf-8)
+endif()
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(lw_ppocr_ocr_core PRIVATE -Wall -Wextra -Wpedantic)
 endif()

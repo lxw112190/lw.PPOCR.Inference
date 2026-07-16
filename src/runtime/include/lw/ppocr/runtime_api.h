@@ -6,6 +6,8 @@
 
 #if defined(_WIN32) && defined(LW_PPOCR_RUNTIME_BUILDING_LIBRARY)
 #define LW_PPOCR_RUNTIME_EXPORT __declspec(dllexport)
+#elif defined(LW_PPOCR_RUNTIME_BUILDING_LIBRARY) && defined(__GNUC__)
+#define LW_PPOCR_RUNTIME_EXPORT __attribute__((visibility("default")))
 #else
 #define LW_PPOCR_RUNTIME_EXPORT
 #endif

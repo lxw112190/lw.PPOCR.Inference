@@ -12,6 +12,27 @@
       "generator": "Visual Studio 17 2022",
       "architecture": "x64",
       "binaryDir": "${sourceDir}/build/vs2022-x64"
+    },
+    {
+      "name": "linux-x64-opencv",
+      "displayName": "Linux x64 OpenCV DNN (Release)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/linux-x64-opencv",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "LW_PPOCR_BUILD_OPENCV_RUNTIME": "ON",
+        "LW_PPOCR_BUILD_HTTP_SERVICE": "ON",
+        "LW_PPOCR_BUILD_STUB_RUNTIME": "ON",
+        "LW_PPOCR_BUILD_TESTS": "ON",
+        "LW_PPOCR_BUILD_DIRECTML_RUNTIME": "OFF",
+        "LW_PPOCR_BUILD_OPENVINO_RUNTIME": "OFF",
+        "LW_PPOCR_BUILD_TENSORRT_RUNTIME": "OFF"
+      }
     }
   ],
   "buildPresets": [
@@ -19,6 +40,10 @@
       "name": "vs2022-x64-release",
       "configurePreset": "vs2022-x64",
       "configuration": "Release"
+    },
+    {
+      "name": "linux-x64-opencv-release",
+      "configurePreset": "linux-x64-opencv"
     }
   ],
   "testPresets": [
@@ -29,7 +54,13 @@
       "output": {
         "outputOnFailure": true
       }
+    },
+    {
+      "name": "linux-x64-opencv-release",
+      "configurePreset": "linux-x64-opencv",
+      "output": {
+        "outputOnFailure": true
+      }
     }
   ]
 }
-

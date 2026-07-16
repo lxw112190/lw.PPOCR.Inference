@@ -2,9 +2,13 @@
 
 [简体中文](README.md) | [English](README_EN.md)
 
-`lw.PPOCR.Inference` is a unified PP-OCR inference project for Windows. It exposes one stable C ABI and isolates OpenCV DNN, ONNX Runtime DirectML, OpenVINO, and TensorRT as independent Runtime plugins.
+Author: **天天代码码天天** · QQ: `819069052`
+
+`lw.PPOCR.Inference` is a unified PP-OCR inference project. It exposes one stable C ABI and isolates OpenCV DNN, ONNX Runtime DirectML, OpenVINO, and TensorRT as independent Runtime plugins. Windows supports all four Runtimes; the first Linux build supports OpenCV DNN.
 
 The current stable release is **v1.1.0**. API v1 and its ABI are frozen. v1.1.0 adds recognition-only calls, the HTTP service, and interactive demos without breaking v1.0.0 callers. See the [v1.1.0 release notes](docs/releases/v1.1.0.md).
+
+The upcoming **v1.2.0 Linux OpenCV DNN preview** targets Ubuntu 20.04 x86_64 and includes full OCR, recognition-only inference, the browser test page, and systemd integration. See [Linux OpenCV DNN deployment](docs/linux-opencv.md). The Windows v1.1.0 archive cannot be converted into a Linux installation by replacing a few files; v1.2.0 is the first full Linux baseline.
 
 Applications only change backend configuration when switching inference frameworks. They do not need to rewrite the OCR workflow. In addition to C#, any language capable of calling a C DLL can integrate with the project, including C, C++, Python, Java, Delphi, Go, and Rust.
 
@@ -18,7 +22,7 @@ Applications only change backend configuration when switching inference framewor
 - Structured results, JSON results, quadrilateral boxes, confidence scores, and per-stage timings
 - BGR, RGB, BGRA, RGBA, and grayscale image inputs
 - .NET binding, unified CLI, and WinForms demo
-- JSON + Base64 HTTP API, browser test page, and Windows Service mode
+- JSON + Base64 HTTP API, browser test page, Windows Service mode, and Linux systemd integration
 - Model packages described by `model.json`, without hard-coded artifact names
 - Instance-owned configuration, workers, and memory with explicit initialization and destruction
 
@@ -48,12 +52,14 @@ golden correctness suite. Version 1.0.0 formally froze API v1 and its ABI. See
 
 The current stable OpenVINO Runtime uses CPU. DirectML can use either CPU or GPU from the demo. TensorRT always requires an NVIDIA GPU.
 
+The Linux v1.2.0 preview bundles minimal OpenCV 5.0 shared libraries built in the Ubuntu 20.04 CI environment and uses the DNN CPU backend. DirectML, OpenVINO, and TensorRT Linux Runtimes are not included in this initial archive.
+
 ## Architecture
 
 ```text
 Any programming language
-    -> lw.PPOCR.dll                 Stable C ABI, validation, Runtime loading
-        -> lw.PPOCR.Runtime.*.dll   Isolated inference backend
+    -> lw.PPOCR.dll / liblw.PPOCR.so       Stable C ABI, validation, Runtime loading
+        -> lw.PPOCR.Runtime.*.dll / .so    Isolated inference backend
             -> OCR Core             Preprocess, DB postprocess, crop, sort, CTC decode
             -> Inference SDK        OpenCV / ORT / OpenVINO / TensorRT
 ```
@@ -65,6 +71,7 @@ runtimes/win-x64/opencv/
 runtimes/win-x64/directml/
 runtimes/win-x64/openvino/
 runtimes/win-x64/tensorrt/
+runtimes/linux-x64/opencv/
 ```
 
 This layout prevents OpenCV, ONNX Runtime, OpenVINO, CUDA, and TensorRT libraries from interfering with each other in the application directory.
@@ -90,6 +97,70 @@ To use the demo:
 Relative model and Runtime paths in the demo are resolved from the EXE directory, independently of the process working directory. `MainForm` uses the standard WinForms Designer layout and can be edited directly in Visual Studio.
 
 Per-backend split packages preselect their included backend and carry the sample model. Run `run-http-service.cmd` for the local HTTP API and browser test page, or `install-service.cmd` to install an automatically started Windows service with administrator approval. See [HTTP API and Windows Service](docs/http-service.md).
+
+For the Linux preview, run `sudo ./install-deps-ubuntu.sh` followed by `./run-http-service.sh`, then open `http://127.0.0.1:8787`. Use `sudo ./install-systemd.sh` for a system service. WinForms is intentionally Windows-only.
+
+The Linux `.tar.gz` uploaded by CI already contains the detector, recognizer and classifier ONNX models, dictionary, `model.json`, sample image, HTML page, HTTP configuration, systemd scripts, and minimal OpenCV 5.0 shared libraries. No files need to be copied separately from the repository; follow the [Linux quick-start instructions](docs/linux-opencv.md#快速体验) after extraction.
+
+## HTTP Service
+
+The HTTP service accepts images as JSON + Base64. It supports the complete detection, optional direction-classification, and recognition pipeline, as well as recognition-only inference for text regions already cropped by the caller. Its browser test page draws detected regions over the source image and displays per-stage timings.
+
+Default address and endpoints:
+
+```text
+Browser test page       GET  http://127.0.0.1:8787/
+Health check            GET  /health
+Complete OCR            POST /api/ocr
+Single/batch recognition POST /api/recognize
+```
+
+Complete OCR request:
+
+```json
+{"image_base64":"data:image/jpeg;base64,..."}
+```
+
+Use `/api/recognize` for one pre-cropped text region:
+
+```json
+{"image_base64":"data:image/png;base64,..."}
+```
+
+Batch recognition accepts up to 256 images:
+
+```json
+{"images_base64":["data:image/png;base64,...","data:image/png;base64,..."]}
+```
+
+### API Key
+
+API Key authentication is disabled by default. Requests require no credentials while `api_key` is empty in `http-service.json`:
+
+```json
+{"api_key":""}
+```
+
+For LAN or service deployments, set it to a sufficiently long random value:
+
+```json
+{"api_key":"replace-with-your-random-secret"}
+```
+
+Once enabled, both `POST /api/ocr` and `POST /api/recognize` require the same value in the `X-API-Key` request header; otherwise, the service returns HTTP 401. `GET /health` remains unauthenticated for health probes.
+
+```bash
+curl -X POST http://127.0.0.1:8787/api/ocr \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: replace-with-your-random-secret" \
+  --data-binary '{"image_base64":"..."}'
+```
+
+The browser page has an API Key field and sends it through the same `X-API-Key` header. It is not placed in the URL or persisted after a page refresh. Startup logs report only whether authentication is enabled and never print the secret value.
+
+The default listener is `127.0.0.1`. For LAN access, change `listen_host` to `0.0.0.0` and also configure an API Key, the operating-system firewall, and trusted-network restrictions. Direct public Internet exposure is not recommended.
+
+On Windows, use `run-http-service.cmd` for foreground execution or run `install-service.cmd` as administrator to install a Windows Service. On Linux, use `./run-http-service.sh` in the foreground or `sudo ./install-systemd.sh` to install under `/opt/lw-ppocr` as a systemd service. See [HTTP API, Windows Service, and Linux systemd](docs/http-service.md) for response fields and detailed deployment instructions.
 
 ## CLI Examples
 

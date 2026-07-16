@@ -1,10 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(lw.PPOCR.Inference VERSION 1.1.0 LANGUAGES C CXX)
-
-if(NOT WIN32)
-    message(FATAL_ERROR "The initial lw.PPOCR.Inference loader targets Windows.")
-endif()
+project(lw.PPOCR.Inference VERSION 1.2.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -20,7 +16,7 @@ option(LW_PPOCR_BUILD_OPENCV_RUNTIME "Build the OpenCV DNN Runtime" OFF)
 option(LW_PPOCR_BUILD_DIRECTML_RUNTIME "Build the ONNX Runtime DirectML Runtime" OFF)
 option(LW_PPOCR_BUILD_OPENVINO_RUNTIME "Build the OpenVINO Runtime" OFF)
 option(LW_PPOCR_BUILD_TENSORRT_RUNTIME "Build the TensorRT Runtime" OFF)
-option(LW_PPOCR_BUILD_HTTP_SERVICE "Build the HTTP API and Windows service host" ON)
+option(LW_PPOCR_BUILD_HTTP_SERVICE "Build the cross-platform HTTP API service host" ON)
 set(LW_PPOCR_OPENCV_ROOT "" CACHE PATH "OpenCV distribution root containing OpenCVConfig.cmake")
 set(LW_PPOCR_ONNXRUNTIME_DML_ROOT "" CACHE PATH "ONNX Runtime DirectML package root")
 set(LW_PPOCR_DIRECTML_DLL "" CACHE FILEPATH "DirectML.dll distributed with ONNX Runtime DirectML")
@@ -50,19 +46,26 @@ target_include_directories(lw_ppocr_core
 )
 target_compile_definitions(lw_ppocr_core PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
 
-add_library(lw_ppocr_loader SHARED
-    src/loader/loader.cpp
-    src/loader/version.rc
-)
+set(LW_PPOCR_LOADER_SOURCES src/loader/loader.cpp)
+if(WIN32)
+    list(APPEND LW_PPOCR_LOADER_SOURCES src/loader/version.rc)
+endif()
+add_library(lw_ppocr_loader SHARED ${LW_PPOCR_LOADER_SOURCES})
 target_include_directories(lw_ppocr_loader
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/include
 )
-target_link_libraries(lw_ppocr_loader PRIVATE lw_ppocr_core)
+target_link_libraries(lw_ppocr_loader PRIVATE lw_ppocr_core ${CMAKE_DL_LIBS})
 target_compile_definitions(lw_ppocr_loader
     PRIVATE LW_PPOCR_BUILDING_LIBRARY WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE
 )
 set_target_properties(lw_ppocr_loader PROPERTIES OUTPUT_NAME "lw.PPOCR")
+if(NOT WIN32)
+    set_target_properties(lw_ppocr_loader PROPERTIES
+        VERSION ${PROJECT_VERSION}
+        SOVERSION 1
+    )
+endif()
 
 if(LW_PPOCR_BUILD_HTTP_SERVICE)
     add_subdirectory(src/http_service)
@@ -107,6 +110,7 @@ install(FILES
     docs/stability-testing.md
     docs/tensorrt-engines.md
     docs/http-service.md
+    docs/linux-opencv.md
     models/model-manifest.schema.json
     DESTINATION docs
 )
@@ -147,6 +151,9 @@ if(LW_PPOCR_BUILD_OPENCV_RUNTIME)
 endif()
 
 if(LW_PPOCR_BUILD_DIRECTML_RUNTIME)
+    if(NOT WIN32)
+        message(FATAL_ERROR "The DirectML Runtime is available on Windows only")
+    endif()
     if(NOT LW_PPOCR_ONNXRUNTIME_DML_ROOT)
         message(FATAL_ERROR "LW_PPOCR_ONNXRUNTIME_DML_ROOT is required")
     endif()
@@ -154,6 +161,9 @@ if(LW_PPOCR_BUILD_DIRECTML_RUNTIME)
 endif()
 
 if(LW_PPOCR_BUILD_OPENVINO_RUNTIME)
+    if(NOT WIN32)
+        message(FATAL_ERROR "The initial Linux release supports OpenCV DNN only")
+    endif()
     if(NOT LW_PPOCR_OPENVINO_ROOT)
         message(FATAL_ERROR "LW_PPOCR_OPENVINO_ROOT is required")
     endif()
@@ -165,6 +175,9 @@ if(LW_PPOCR_BUILD_OPENVINO_RUNTIME)
 endif()
 
 if(LW_PPOCR_BUILD_TENSORRT_RUNTIME)
+    if(NOT WIN32)
+        message(FATAL_ERROR "The initial Linux release supports OpenCV DNN only")
+    endif()
     if(NOT LW_PPOCR_TENSORRT_ROOT)
         message(FATAL_ERROR "LW_PPOCR_TENSORRT_ROOT is required")
     endif()

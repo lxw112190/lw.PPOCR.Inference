@@ -114,16 +114,28 @@ const char* BackendDirectory(lw_ppocr_backend backend) noexcept {
     }
 }
 
-const wchar_t* BackendLibraryName(lw_ppocr_backend backend) noexcept {
+const char* BackendLibraryName(lw_ppocr_backend backend) noexcept {
     switch (backend) {
     case LW_PPOCR_BACKEND_OPENCV_DNN:
-        return L"lw.PPOCR.Runtime.OpenCVDNN.dll";
+#if defined(_WIN32)
+        return "lw.PPOCR.Runtime.OpenCVDNN.dll";
+#else
+        return "liblw.PPOCR.Runtime.OpenCVDNN.so";
+#endif
     case LW_PPOCR_BACKEND_DIRECTML:
-        return L"lw.PPOCR.Runtime.DirectML.dll";
+        return "lw.PPOCR.Runtime.DirectML.dll";
     case LW_PPOCR_BACKEND_OPENVINO:
-        return L"lw.PPOCR.Runtime.OpenVINO.dll";
+#if defined(_WIN32)
+        return "lw.PPOCR.Runtime.OpenVINO.dll";
+#else
+        return "liblw.PPOCR.Runtime.OpenVINO.so";
+#endif
     case LW_PPOCR_BACKEND_TENSORRT:
-        return L"lw.PPOCR.Runtime.TensorRT.dll";
+#if defined(_WIN32)
+        return "lw.PPOCR.Runtime.TensorRT.dll";
+#else
+        return "liblw.PPOCR.Runtime.TensorRT.so";
+#endif
     default:
         return nullptr;
     }

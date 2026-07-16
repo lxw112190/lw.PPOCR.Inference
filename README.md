@@ -2,9 +2,13 @@
 
 [简体中文](README.md) | [English](README_EN.md)
 
-`lw.PPOCR.Inference` 是一个面向 Windows 的统一 PP-OCR 推理项目。项目通过稳定的 C ABI 对外提供一致接口，并将 OpenCV DNN、ONNX Runtime DirectML、OpenVINO、TensorRT 四种推理后端隔离为独立 Runtime。
+作者：**天天代码码天天**　QQ：`819069052`
+
+`lw.PPOCR.Inference` 是一个统一 PP-OCR 推理项目。项目通过稳定的 C ABI 对外提供一致接口，并将 OpenCV DNN、ONNX Runtime DirectML、OpenVINO、TensorRT 四种推理后端隔离为独立 Runtime。Windows 支持四种 Runtime；Linux 首版先支持 OpenCV DNN。
 
 当前稳定版本为 **v1.1.0**。API v1 与 ABI 已冻结；v1.1.0 以追加方式提供只识别接口、HTTP 服务和交互式 Demo，不破坏 v1.0.0 调用方。详见 [v1.1.0 Release Notes](docs/releases/v1.1.0.md)。
+
+正在准备的 **v1.2.0 Linux OpenCV DNN 预览版**面向 Ubuntu 20.04 x86_64，包含完整 OCR、只识别、HTTP 测试网页和 systemd 服务。构建与虚拟机验证流程见 [Linux OpenCV DNN 部署](docs/linux-opencv.md)。v1.1.0 Windows 包不能通过增量替换转换成 Linux 包；v1.2.0 将作为 Linux 的首个完整基线包。
 
 上层程序只需要切换后端配置，不需要为不同推理框架重写 OCR 调用逻辑。除 C# 外，任何支持调用 C DLL 的语言都可以接入，例如 C、C++、Python、Java、Delphi、Go、Rust 等。
 
@@ -18,7 +22,7 @@
 - 支持结构化结果、JSON 结果、文字框、置信度和分阶段耗时
 - 支持 BGR、RGB、BGRA、RGBA、灰度图等常见像素格式
 - 提供 .NET 封装、命令行程序和 WinForms 体验程序
-- 提供 JSON + Base64 HTTP API、测试网页和 Windows Service 部署模式
+- 提供 JSON + Base64 HTTP API、测试网页、Windows Service 和 Linux systemd 部署模式
 - 模型由 `model.json` 统一描述，应用程序无需硬编码模型文件名
 - 每个引擎实例独立管理配置、线程和内存，可显式初始化与销毁
 
@@ -42,12 +46,14 @@
 
 当前稳定策略中，OpenVINO 使用 CPU；DirectML 可在界面中选择 CPU 或 GPU；TensorRT 始终使用 NVIDIA GPU。
 
+Linux v1.2.0 预览包随附在 Ubuntu 20.04 CI 环境中构建的最小 OpenCV 5.0 动态库，并使用 DNN CPU 后端。DirectML、OpenVINO 和 TensorRT 的 Linux Runtime 暂不包含在该包内。
+
 ## 架构
 
 ```text
 任意编程语言
-    -> lw.PPOCR.dll                 稳定 C ABI、参数校验、Runtime 加载
-        -> lw.PPOCR.Runtime.*.dll   独立推理后端
+    -> lw.PPOCR.dll / liblw.PPOCR.so       稳定 C ABI、参数校验、Runtime 加载
+        -> lw.PPOCR.Runtime.*.dll / .so    独立推理后端
             -> OCR Core             预处理、DB 后处理、裁剪、排序、CTC 解码
             -> 推理框架             OpenCV / ORT / OpenVINO / TensorRT
 ```
@@ -59,6 +65,7 @@ runtimes/win-x64/opencv/
 runtimes/win-x64/directml/
 runtimes/win-x64/openvino/
 runtimes/win-x64/tensorrt/
+runtimes/linux-x64/opencv/
 ```
 
 这种布局可以避免 OpenCV、ONNX Runtime、OpenVINO、CUDA 和 TensorRT 的 DLL 在程序根目录互相影响。
@@ -84,6 +91,70 @@ runtimes/win-x64/tensorrt/
 界面中的模型和 Runtime 相对路径均以 EXE 所在目录为基准，不受程序启动工作目录影响。`MainForm` 使用标准 WinForms Designer 文件组织，可直接在 Visual Studio 中编辑界面。
 
 按后端拆分的包会预选对应后端并附带体验模型。双击 `run-http-service.cmd` 可启动本机 HTTP API 和测试网页；`install-service.cmd` 可通过管理员权限安装为自动启动的 Windows 服务。API 说明见 [HTTP API 与 Windows Service](docs/http-service.md)。
+
+Linux 预览包解压后执行 `sudo ./install-deps-ubuntu.sh` 和 `./run-http-service.sh`，浏览器同样访问 `http://127.0.0.1:8787`；执行 `sudo ./install-systemd.sh` 可安装为系统服务。Linux 不提供 WinForms Demo。
+
+CI 上传的 Linux `.tar.gz` 已包含 `det/rec/cls.onnx`、字典、`model.json`、测试图片、HTML 页面、HTTP 配置、systemd 脚本和最小 OpenCV 5.0 动态库。解压后无需从仓库另外复制资源；按 [Linux 快速体验步骤](docs/linux-opencv.md#快速体验) 即可启动。
+
+## HTTP 服务
+
+HTTP 服务使用 JSON + Base64 接收图片，既可以执行检测、方向分类和识别的完整流程，也可以直接识别客户已经裁剪好的文字区域。服务同时提供浏览器测试页面，完整 OCR 的结果会在原图上绘制文字区域并显示各阶段耗时。
+
+默认地址和主要接口：
+
+```text
+测试网页              GET  http://127.0.0.1:8787/
+健康检查              GET  /health
+完整 OCR              POST /api/ocr
+单张或批量只识别      POST /api/recognize
+```
+
+完整 OCR 请求：
+
+```json
+{"image_base64":"data:image/jpeg;base64,..."}
+```
+
+已经裁剪好的单张文字区域使用 `/api/recognize`：
+
+```json
+{"image_base64":"data:image/png;base64,..."}
+```
+
+批量只识别最多接受 256 张图片：
+
+```json
+{"images_base64":["data:image/png;base64,...","data:image/png;base64,..."]}
+```
+
+### API Key
+
+API Key 功能默认关闭。配置文件 `http-service.json` 中的 `api_key` 为空字符串时，请求不需要认证：
+
+```json
+{"api_key":""}
+```
+
+局域网或服务化部署时，建议设置一个足够长的随机字符串：
+
+```json
+{"api_key":"请替换为自己的随机密钥"}
+```
+
+启用后，`POST /api/ocr` 和 `POST /api/recognize` 必须通过 `X-API-Key` 请求头传递相同的值，否则返回 HTTP 401。`GET /health` 保持免认证，便于探活。
+
+```bash
+curl -X POST http://127.0.0.1:8787/api/ocr \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: 请替换为自己的随机密钥" \
+  --data-binary '{"image_base64":"..."}'
+```
+
+浏览器测试页面也提供 API Key 输入框，并使用相同的 `X-API-Key` 请求头。输入值不会写入 URL，也不会在刷新后保存。服务启动日志只显示 API Key 是否启用，不输出密钥明文。
+
+默认服务只监听 `127.0.0.1`。如需局域网访问，可把 `listen_host` 改为 `0.0.0.0`，同时必须配置 API Key、操作系统防火墙和可信网络访问规则，不建议直接暴露到公网。
+
+Windows 使用 `run-http-service.cmd` 前台启动，或以管理员身份运行 `install-service.cmd` 安装为 Windows Service。Linux 使用 `./run-http-service.sh` 前台启动，或运行 `sudo ./install-systemd.sh` 安装到 `/opt/lw-ppocr` 并注册为 systemd 服务。更完整的配置、响应字段和部署说明见 [HTTP API、Windows Service 与 Linux systemd](docs/http-service.md)。
 
 ## 命令行示例
 

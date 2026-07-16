@@ -12,7 +12,11 @@
 #endif
 #else
 #define LW_PPOCR_CALL
+#if defined(LW_PPOCR_BUILDING_LIBRARY) && defined(__GNUC__)
+#define LW_PPOCR_API __attribute__((visibility("default")))
+#else
 #define LW_PPOCR_API
+#endif
 #endif
 
 #ifdef __cplusplus
@@ -26,7 +30,7 @@ extern "C" {
 #define LW_PPOCR_ABI_FINGERPRINT_V1_1 UINT64_C(0x4C5750504F435202)
 #define LW_PPOCR_ABI_FINGERPRINT LW_PPOCR_ABI_FINGERPRINT_V1_1
 #define LW_PPOCR_VERSION_MAJOR 1u
-#define LW_PPOCR_VERSION_MINOR 1u
+#define LW_PPOCR_VERSION_MINOR 2u
 #define LW_PPOCR_VERSION_PATCH 0u
 
 typedef struct lw_ppocr_engine* lw_ppocr_handle;

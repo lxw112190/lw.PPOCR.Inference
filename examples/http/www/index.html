@@ -14,6 +14,7 @@
     .card { margin-top: 18px; padding: 18px; border: 1px solid #293755; border-radius: 14px; background: #121a2d; box-shadow: 0 12px 34px #03071255; }
     .toolbar { display: grid; grid-template-columns: minmax(260px,1fr) 190px 220px auto; gap: 12px; align-items: end; }
     label { display: grid; gap: 7px; color: #9badcf; font-size: 13px; }
+    .hint { color: #7084aa; font-size: 12px; line-height: 1.45; }
     input, select, button { min-height: 42px; border: 1px solid #344563; border-radius: 8px; font: inherit; }
     input, select { padding: 8px 10px; color: #e8eefc; background: #0b1222; }
     button { padding: 8px 20px; color: white; background: #2878ff; cursor: pointer; font-weight: 650; border-color: #438aff; }
@@ -42,7 +43,10 @@
     <div class="toolbar">
       <label>图片（JPEG / PNG / BMP / GIF / TIFF）<input id="file" type="file" accept="image/*"></label>
       <label>处理方式<select id="mode"><option value="ocr">完整 OCR</option><option value="recognize">仅文字识别</option></select></label>
-      <label>API Key（未配置可留空）<input id="key" type="password" autocomplete="off"></label>
+      <label>API Key（未配置可留空）
+        <input id="key" type="password" autocomplete="off" placeholder="对应 http-service.json 中的 api_key">
+        <small class="hint">服务配置了 api_key 时必填；网页会通过 X-API-Key 请求头发送，不会写入 URL。</small>
+      </label>
       <button id="run" disabled>开始识别</button>
     </div>
     <div id="stage" class="stage"><canvas id="canvas"></canvas></div>
@@ -54,6 +58,7 @@
     <table><thead><tr><th>#</th><th>文本</th><th>置信度</th><th>方向分类</th><th>坐标</th></tr></thead><tbody id="rows"></tbody></table>
   </section>
   <section class="card"><strong>JSON 响应</strong><pre id="json">尚未请求</pre></section>
+  <p class="sub" style="margin-top:16px">作者：天天代码码天天　QQ：819069052</p>
 </main>
 <script>
   const file = document.querySelector('#file');
@@ -69,9 +74,11 @@
   const sourceImage = new Image();
   let imageBase64 = '';
   let lastRegions = [];
+  let apiKeyRequired = false;
 
   fetch('/health').then(r => r.json()).then(data => {
-    status.textContent = `服务就绪：${data.backend_name || data.backend}`;
+    apiKeyRequired = Boolean(data.api_key_required);
+    status.textContent = `服务就绪：${data.backend_name || data.backend}；API Key：${apiKeyRequired ? '已启用，请填写' : '未启用'}`;
   }).catch(error => { status.textContent = `服务检查失败：${error}`; });
 
   function redraw(regions = lastRegions) {
@@ -144,6 +151,7 @@
     try {
       const headers = {'Content-Type': 'application/json'};
       const key = document.querySelector('#key').value;
+      if (apiKeyRequired && !key) throw new Error('服务已启用 API Key，请先填写');
       if (key) headers['X-API-Key'] = key;
       const recognitionOnly = mode.value === 'recognize';
       const response = await fetch(recognitionOnly ? '/api/recognize' : '/api/ocr', {

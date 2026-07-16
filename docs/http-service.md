@@ -1,10 +1,12 @@
-# HTTP API 与 Windows Service
+# HTTP API、Windows Service 与 Linux systemd
 
-`lw.PPOCR.HttpService.exe` 是基于 cpp-httplib 的原生 Windows x64 服务程序，使用 JSON + Base64 接收图片，通过统一 C ABI 调用配置的 OCR Runtime。
+HTTP 服务基于 cpp-httplib，使用 JSON + Base64 接收图片，通过统一 C ABI 调用配置的 OCR Runtime。Windows 程序名为 `lw.PPOCR.HttpService.exe`；Linux 程序名为 `lw-ppocr-http-service`。
+
+程序启动时先输出作者“天天代码码天天”、QQ `819069052`，随后输出监听地址、后端、Runtime、模型、线程数、请求限制和 API 参数格式。为避免泄漏凭据，API Key 只显示是否已配置，不显示明文。Windows Service 模式还会把这段信息写入 EXE 同目录的 `http-service.log`；Linux systemd 可通过 `journalctl` 查看。
 
 ## 快速使用
 
-解压任一后端拆分包后，双击 `run-http-service.cmd`，浏览器访问：
+Windows 解压任一后端拆分包后双击 `run-http-service.cmd`；Linux 解压 OpenCV DNN 包后执行 `./run-http-service.sh`。浏览器访问：
 
 ```text
 http://127.0.0.1:8787/
@@ -73,17 +75,32 @@ Content-Type: application/json
 
 批量接口最多接受 256 张图片，结果按输入顺序返回，并通过 `source_index` 映射原始数组。该接口不执行文本检测；是否执行方向分类由服务配置的 `enable_classifier` 决定。
 
-Base64 可以带 `data:image/...;base64,` 前缀，也可以仅传纯 Base64。图片由 Windows Imaging Component 解码，支持 JPEG、PNG、BMP、GIF 和 TIFF。
+Base64 可以带 `data:image/...;base64,` 前缀，也可以仅传纯 Base64。Windows 使用 Windows Imaging Component 解码；Linux 使用 OpenCV `imdecode`，实际格式由系统 OpenCV 构建决定。
 
 ## 配置与安全
 
-配置文件为 EXE 同目录的 `http-service.json`，相对路径均以配置文件所在目录为基准。默认仅绑定 `127.0.0.1`。如需局域网访问，应同时完成以下配置：
+配置文件为程序同目录的 `http-service.json`，相对路径均以配置文件所在目录为基准。默认仅绑定 `127.0.0.1`。如需局域网访问，应同时完成以下配置：
 
 - 将 `listen_host` 改为 `0.0.0.0`。
 - 设置非空 `api_key`，客户端通过 `X-API-Key` 请求头传递。
 - 配置 Windows 防火墙，并限制在可信网络内访问。
 
+Linux 应同步配置主机防火墙；两种系统都不应把未设置 API Key 的服务直接暴露到公网。
+
 可调限制包括 `max_request_bytes`、`max_image_pixels` 和 `worker_threads`。服务在 Base64 解码及图片解码阶段都会执行大小检查。
+
+### API Key 的使用
+
+API Key 功能已经实现。`http-service.json` 中的 `api_key` 为空时不验证；设置为非空字符串后，`POST /api/ocr` 和 `POST /api/recognize` 都必须携带完全一致的 `X-API-Key` 请求头，否则返回 HTTP 401。`GET /health` 保持免认证，供服务探活使用。
+
+```bash
+curl -X POST http://127.0.0.1:8787/api/ocr \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: 请替换成配置中的值" \
+  --data-binary '{"image_base64":"..."}'
+```
+
+测试网页的 API Key 输入框使用同一个请求头，不会把 Key 放进 URL。网页刷新后不会保存输入值。如果服务未配置 API Key，该输入框可以留空。
 
 ## Windows Service
 
@@ -95,3 +112,16 @@ lw.PPOCR.HttpService.exe --uninstall --config http-service.json
 ```
 
 拆分包中的 `install-service.cmd` 和 `uninstall-service.cmd` 提供同样功能。服务默认使用自动（延迟）启动。不同后端可以使用不同 `service_name` 并行安装，但必须配置不同端口。
+
+## Linux systemd
+
+Ubuntu 20.04 OpenCV DNN 包提供：
+
+```bash
+sudo ./install-deps-ubuntu.sh
+sudo ./install-systemd.sh
+systemctl status lw-ppocr-http.service
+journalctl -u lw-ppocr-http.service -f
+```
+
+安装目录固定为 `/opt/lw-ppocr`。`uninstall-systemd.sh` 只移除 systemd 单元，保留模型和配置。完整说明见 [Linux OpenCV DNN 部署](linux-opencv.md)。

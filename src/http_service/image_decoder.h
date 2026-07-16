@@ -13,9 +13,9 @@ struct DecodedImage {
     uint32_t stride = 0;
 };
 
-bool DecodeImageWithWic(const std::vector<uint8_t>& encoded,
-                        uint64_t maximum_pixels,
-                        DecodedImage& image,
-                        std::string& error);
+bool DecodeImage(const std::vector<uint8_t>& encoded,
+                 uint64_t maximum_pixels,
+                 DecodedImage& image,
+                 std::string& error);
 
 }  // namespace lw::ppocr::http
