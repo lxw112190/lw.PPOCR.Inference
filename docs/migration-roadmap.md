@@ -1,47 +1,66 @@
-# Migration Roadmap
+# Roadmap
 
-## Phase 1: Contract
+> 已完成里程碑见下方 [Completed](#completed) 节。本节聚焦当前至 v1.0.0 的路线。
 
-- Freeze API v1 after OpenCV DNN stability and binding tests are complete.
-- Validate UTF-8, image stride, allocation ownership, error propagation, and
-  repeated create/run/destroy behavior.
-- Establish the model manifest schema and dependency layout.
+## v0.3.0 (已完成) — Schema 冻结、Golden 正确性测试
 
-## Phase 2: OpenCV DNN
+- [x] 模型清单 JSON Schema v1 冻结：添加 `$id`、字段描述、兼容性承诺
+- [x] Golden 正确性测试框架：文字、包围框坐标（±2 px）、置信度（±0.02）逐区域比对
+- [x] `LW_PPOCR_RECORD_GOLDEN=1` 录制模式
+- [x] 版本号同步至 0.3.0（11 文件）
+- 详见 [docs/releases/v0.3.0.md](releases/v0.3.0.md)
 
-- [x] Migrate shared preprocessing and postprocessing into Core.
-- [x] Implement the first production Runtime.
-- [x] Run a real PP-OCRv5 model through the public Loader ABI.
-- [x] Add repeated-run memory and result-count baselines.
-- [ ] Compare warm timing against the existing OpenCV DNN demo.
+## v0.5.0 (已完成) — C/Python 示例、后端拆包、CI
 
-## Phase 3: GPU runtimes
+- [x] C 示例：`examples/c/main.c` + `CMakeLists.txt`，LoadLibrary 动态加载
+- [x] Python 示例：`examples/python/ppocr.py` + `pyproject.toml`
+- [x] 后端拆包：`-Split` / `-Runtime` 参数
+- [x] GitHub Actions CI：VS 构建 + ABI + golden
 
-- [x] Migrate DirectML with isolated ONNX Runtime and DirectML dependencies.
-- [x] Preserve independent recognition sessions and ratio-bucket concurrency.
-- [x] Add DirectML device selection, capabilities, optional classifier, and a
-  real-model integration test.
-- [x] Migrate OpenVINO as an isolated CPU Runtime with shared compiled models.
-- [x] Reproduce and guard the unstable OpenVINO GPU/OpenCL path at creation.
-- [x] Migrate TensorRT with shared engines and independent CUDA contexts.
-- [x] Add offline engine conversion profiles and a V6 FP16 integration test.
-- [ ] Expand backend-specific diagnostics and adapter enumeration.
+## v0.8.0 (已完成) — ABI 候选冻结、兼容矩阵、许可证审计
 
-## Phase 4: Bindings and distribution
+- [x] `docs/abi-freeze-candidate.md`：冻结范围和非冻结范围
+- [x] `docs/compatibility-matrix.md`：四后端兼容矩阵和最低要求
+- [x] `docs/license-audit.md`：第三方许可证完整审计
 
-- [x] Add the first safe-handle .NET binding and Runtime capability query.
-- [x] Add a backend-neutral .NET CLI exercising the public Loader API.
-- [x] Add a unified WinForms experience program for all four backends.
-- [x] Produce a clean Windows x64 layout with isolated Runtime dependencies and
-  a SHA-256 file manifest.
-- Complete the .NET SDK and unified WinForms application.
-- Add Python and Java bindings without changing the native ABI.
-- Publish backend-specific ZIP and package-manager artifacts.
+## v0.9.0-rc.1 (已完成) — 发布候选
 
-## Phase 5: Benchmark and stability
+- [x] 冻结全部公共接口
+- [x] Release Notes 和 RC 验证清单
 
-- Run each backend in an isolated worker process.
-- Record cold start, warm P50/P90/P99 latency, throughput, memory, and VRAM.
-- [x] Add long-running lifecycle, concurrency, malformed-input, and resource
-  growth tests.
-- Add golden text and box-coordinate result baselines.
+## v1.0.0 (已完成) — ABI 正式冻结
+
+- [x] `LW_PPOCR_API_VERSION` 永久锁定为 `1`
+- [x] `docs/abi-v1-stability.md`：长期支持承诺（安全修复 ≥2 年）
+- [x] 向后兼容承诺：struct 只追加、enum 只追加、函数不删
+- [x] Schema v1 永久固定
+
+---
+
+## Completed
+
+### Phase 1–2: Contract & OpenCV DNN (v0.1.0)
+
+- [x] 公共 C ABI 定型，UTF-8、生命周期、错误传播验证通过
+- [x] 模型清单 Schema 初版
+- [x] OpenCV DNN Runtime 完成真实模型端到端测试
+- [x] 统一 Loader + Stub Runtime 测试通过
+
+### Phase 3: GPU Runtimes (v0.1.0–v0.2.0)
+
+- [x] DirectML：独立 ORT/DML 依赖、GPU 选择、CLS、CPU fallback
+- [x] OpenVINO：CPU-only 稳定版、共享 compiled model、concurrency≤8、GPU 路径禁用
+- [x] TensorRT：FP16 engine 直读、共享 ICudaEngine、独立 context/stream/buffer
+- [x] 四后端集成测试：真实模型、区域数校验、压力测试（100 次顺序 + 4 线程×10 次）
+
+### Phase 4: Bindings & Distribution (v0.1.0–v0.2.0)
+
+- [x] .NET SafeHandle binding + CLI（UnifiedCli）+ WinForms Demo（UnifiedDemo）
+- [x] Windows x64 统一发布包 + `package-files.sha256`
+
+### Phase 5: Stability & Golden (v0.2.0–v0.3.0)
+
+- [x] ABI 稳定性：1,000 生命周期 + 10,000 连续调用 + 8 线程并发 + 多实例
+- [x] 私有内存/句柄增长回归检查（≤256 MiB / ≤32 handles）
+- [x] 性能报告：四后端 P50/P95/均值/wall time（500×500 图片）
+- [x] Schema v1 冻结、Golden 正确性测试

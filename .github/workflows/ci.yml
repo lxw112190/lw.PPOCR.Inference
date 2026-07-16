@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ------------------------------------------------------------------
+  # Quick gate: VS preset build + ABI smoke + ABI stability + golden
+  # Runs on GitHub Windows runner — no GPU or vendor SDK required.
+  # ------------------------------------------------------------------
+  build-and-smoke:
+    name: Build & ABI smoke (VS 2022)
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+
+      - name: Configure (VS preset)
+        run: cmake --preset vs2022-x64
+
+      - name: Build Release
+        run: cmake --build --preset vs2022-x64-release
+
+      - name: ABI smoke test
+        run: ctest --preset vs2022-x64-release -R lw.ppocr.abi.smoke --output-on-failure
+
+      - name: ABI stability test
+        run: ctest --preset vs2022-x64-release -R lw.ppocr.abi.stability --output-on-failure
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-vs2022-x64
+          path: build/vs2022-x64/bin/
+          retention-days: 1
+
+  # ------------------------------------------------------------------
+  # OpenCV DNN integration + golden correctness
+  # ------------------------------------------------------------------
+  opencv-integration:
+    name: OpenCV DNN integration & golden
+    runs-on: windows-2022
+    needs: build-and-smoke
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-vs2022-x64
+          path: build/vs2022-x64/bin/
+
+      - name: Install OpenCV
+        run: |
+          $url = "https://github.com/opencv/opencv/releases/download/5.0.0/opencv-5.0.0-windows-x64-vc17.exe"
+          $installer = "${{ runner.temp }}\opencv.exe"
+          Invoke-WebRequest -Uri $url -OutFile $installer
+          Start-Process -FilePath $installer -ArgumentList @("-o${{ runner.temp }}\opencv", "-y") -Wait -NoNewWindow
+          echo "OpenCV_ROOT=${{ runner.temp }}\opencv\opencv\build" >> $env:GITHUB_ENV
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+
+      - name: Configure with OpenCV Runtime
+        run: |
+          cmake -S . -B build/vs2022-x64-opencv -G "Visual Studio 17 2022" -A x64 `
+            -DLW_PPOCR_BUILD_OPENCV_RUNTIME=ON `
+            -DLW_PPOCR_OPENCV_ROOT="$env:OpenCV_ROOT" `
+            -DLW_PPOCR_BUILD_TESTS=ON `
+            -DLW_PPOCR_BUILD_STUB_RUNTIME=ON `
+            -DLW_PPOCR_TEST_DET_MODEL="${{ github.workspace }}/models/ppocrv6-tiny/det.onnx" `
+            -DLW_PPOCR_TEST_REC_MODEL="${{ github.workspace }}/models/ppocrv6-tiny/rec.onnx" `
+            -DLW_PPOCR_TEST_CLS_MODEL="${{ github.workspace }}/models/ppocrv6-tiny/cls.onnx" `
+            -DLW_PPOCR_TEST_DICTIONARY="${{ github.workspace }}/models/ppocrv6-tiny/ppocr_keys.txt" `
+            -DLW_PPOCR_TEST_IMAGE="${{ github.workspace }}/models/ppocrv6-tiny/sample.jpg"
+
+      - name: Build Release
+        run: cmake --build build/vs2022-x64-opencv --config Release
+
+      - name: OpenCV integration test
+        run: |
+          $env:PATH = "${{ github.workspace }}\build\vs2022-x64-opencv\bin\Release;$env:PATH"
+          ctest --test-dir build/vs2022-x64-opencv -C Release `
+            -R lw.ppocr.opencv.integration --output-on-failure
+
+      - name: Golden correctness test
+        run: |
+          $env:PATH = "${{ github.workspace }}\build\vs2022-x64-opencv\bin\Release;$env:PATH"
+          ctest --test-dir build/vs2022-x64-opencv -C Release `
+            -R lw.ppocr.golden --output-on-failure
+
+  # ------------------------------------------------------------------
+  # C example compilation test
+  # ------------------------------------------------------------------
+  c-example:
+    name: C example build
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+
+      - name: Build C example
+        working-directory: examples/c
+        run: cl /utf-8 /W4 /Fe:ppocr_example.exe main.c

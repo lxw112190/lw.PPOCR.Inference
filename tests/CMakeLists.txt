@@ -139,4 +139,49 @@ if(TARGET lw_ppocr_runtime_opencv_dnn OR
             TIMEOUT 300
         )
     endif()
+
+    if(TARGET lw_ppocr_runtime_opencv_dnn AND
+       LW_PPOCR_TEST_DET_MODEL AND LW_PPOCR_TEST_REC_MODEL AND
+       LW_PPOCR_TEST_DICTIONARY AND LW_PPOCR_TEST_IMAGE)
+        add_executable(lw_ppocr_golden_test
+            golden_test.cpp
+        )
+        target_include_directories(lw_ppocr_golden_test
+            PRIVATE ${CMAKE_SOURCE_DIR}/include ${OpenCV_INCLUDE_DIRS}
+        )
+        target_link_libraries(lw_ppocr_golden_test
+            PRIVATE lw_ppocr_loader ${OpenCV_LIBS}
+        )
+        if(MSVC)
+            target_compile_options(lw_ppocr_golden_test
+                PRIVATE /W4 /permissive- /utf-8
+            )
+        endif()
+
+        set(LW_PPOCR_GOLDEN_FILE
+            "${CMAKE_SOURCE_DIR}/tests/golden/sample.jpg.golden.json"
+        )
+        set(LW_PPOCR_TEST_CLS_ARG
+            "${LW_PPOCR_TEST_CLS_MODEL}"
+        )
+        if(NOT LW_PPOCR_TEST_CLS_MODEL)
+            set(LW_PPOCR_TEST_CLS_ARG "none")
+        endif()
+
+        add_test(
+            NAME lw.ppocr.golden
+            COMMAND lw_ppocr_golden_test
+                $<TARGET_FILE:lw_ppocr_runtime_opencv_dnn>
+                "${LW_PPOCR_TEST_DET_MODEL}"
+                "${LW_PPOCR_TEST_REC_MODEL}"
+                "${LW_PPOCR_TEST_DICTIONARY}"
+                "${LW_PPOCR_TEST_IMAGE}"
+                "${LW_PPOCR_TEST_CLS_ARG}"
+                "${LW_PPOCR_GOLDEN_FILE}"
+        )
+        set_tests_properties(lw.ppocr.golden PROPERTIES
+            LABELS "golden"
+            TIMEOUT 120
+        )
+    endif()
 endif()

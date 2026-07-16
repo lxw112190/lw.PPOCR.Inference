@@ -1,6 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/lxw112190/lw.PPOCR.Inference/main/models/model-manifest.schema.json",
+  "$comment": "lw.PPOCR model manifest schema v1 — frozen as of v0.3.0. Backward-compatible additions only (new optional properties, new enum values). Do not remove, rename, or retype existing fields.",
   "title": "lw.PPOCR model manifest",
+  "description": "Describes an OCR model package: dictionary, detector, optional classifier, and recognizer. Each stage lists one or more backend-specific artifacts (ONNX, OpenVINO IR, or TensorRT engine). The manifest is the single source of truth; applications must not hard-code model filenames.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -12,35 +15,44 @@
   ],
   "properties": {
     "schema_version": {
+      "description": "Manifest schema version. Currently only version 1 is defined.",
       "const": 1
     },
     "name": {
+      "description": "Human-readable model package name, e.g. 'PP-OCRv6 tiny Chinese'.",
       "type": "string",
       "minLength": 1
     },
     "family": {
+      "description": "Model family identifier shared across variants, e.g. 'PP-OCRv6'.",
       "type": "string",
       "minLength": 1
     },
     "language": {
+      "description": "ISO 639-1-style language code for the recognition dictionary, e.g. 'ch', 'en', 'japan', 'korean'.",
       "type": "string",
       "default": "ch"
     },
     "dictionary": {
+      "description": "Recognition dictionary file (one label per line, UTF-8). Path is relative to the manifest directory.",
       "$ref": "#/$defs/file"
     },
     "stages": {
+      "description": "OCR pipeline stages. detector and recognizer are required; classifier is optional.",
       "type": "object",
       "additionalProperties": false,
       "required": ["detector", "recognizer"],
       "properties": {
         "detector": {
+          "description": "Text detection stage.",
           "$ref": "#/$defs/stage"
         },
         "classifier": {
+          "description": "Direction classification stage (optional). When absent, CLS is disabled regardless of runtime configuration.",
           "$ref": "#/$defs/stage"
         },
         "recognizer": {
+          "description": "Text recognition stage.",
           "$ref": "#/$defs/stage"
         }
       }
@@ -48,21 +60,25 @@
   },
   "$defs": {
     "file": {
+      "description": "A file reference with an optional SHA-256 integrity hash.",
       "type": "object",
       "additionalProperties": false,
       "required": ["path"],
       "properties": {
         "path": {
+          "description": "Path to the file, relative to the manifest directory.",
           "type": "string",
           "minLength": 1
         },
         "sha256": {
+          "description": "Lowercase hex SHA-256 digest of the file contents (64 characters). Optional but recommended for release packaging.",
           "type": "string",
           "pattern": "^[A-Fa-f0-9]{64}$"
         }
       }
     },
     "shape": {
+      "description": "Tensor shape as an integer array. Use -1 for dynamic batch or spatial dimensions. Must have 3 or 4 elements (NCHW or CHW).",
       "type": "array",
       "minItems": 3,
       "maxItems": 4,
@@ -71,41 +87,51 @@
       }
     },
     "artifact": {
+      "description": "A single model file in a specific format and precision.",
       "type": "object",
       "additionalProperties": false,
       "required": ["path", "format", "precision"],
       "properties": {
         "path": {
+          "description": "Path to the model file, relative to the manifest directory.",
           "type": "string",
           "minLength": 1
         },
         "format": {
+          "description": "Model file format. 'onnx' for ONNX (used by OpenCV DNN, DirectML, OpenVINO). 'openvino-ir' for OpenVINO intermediate representation. 'tensorrt-engine' for prebuilt TensorRT engines.",
           "enum": ["onnx", "openvino-ir", "tensorrt-engine"]
         },
         "precision": {
+          "description": "Numerical precision of the model weights.",
           "enum": ["fp32", "fp16", "int8"]
         },
         "sha256": {
+          "description": "Lowercase hex SHA-256 digest of the artifact file. Optional but recommended for release packaging.",
           "type": "string",
           "pattern": "^[A-Fa-f0-9]{64}$"
         }
       }
     },
     "stage": {
+      "description": "A single OCR pipeline stage with an input shape and one or more backend artifacts.",
       "type": "object",
       "additionalProperties": false,
       "required": ["input_shape", "artifacts"],
       "properties": {
         "input_name": {
+          "description": "Name of the input tensor in the model graph. Defaults to the framework's convention when omitted.",
           "type": "string"
         },
         "output_name": {
+          "description": "Name of the output tensor in the model graph. Defaults to the framework's convention when omitted.",
           "type": "string"
         },
         "input_shape": {
+          "description": "Expected input tensor shape. -1 for dynamic dimensions.",
           "$ref": "#/$defs/shape"
         },
         "artifacts": {
+          "description": "Backend-specific model artifacts keyed by a local backend identifier (e.g. 'onnx', 'tensorrt'). Each value describes one artifact file.",
           "type": "object",
           "minProperties": 1,
           "additionalProperties": {

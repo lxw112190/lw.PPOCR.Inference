@@ -25,7 +25,7 @@
 - 结构化结果和 JSON 字符串必须使用创建它们的同一实例释放。
 - `Destroy` 不能与推理并发执行；销毁前必须等待所有调用结束并释放全部结果。
 
-`v0.2.0` 增加了 1,000 次生命周期、10,000 次连续调用、8 线程共享实例、
+`v0.2.0` 增加了生命周期、长循环、并发和多实例稳定性测试；`v0.3.0` 冻结了模型清单 Schema v1 并增加了 golden 正确性测试集。
 多实例并行，以及四个真实后端的模型压力测试。测试方法和资源增长阈值见
 [稳定性测试说明](docs/stability-testing.md)。
 
@@ -302,6 +302,18 @@ dist/lw.PPOCR.Inference-win-x64/
 
 脚本会发布 Loader、Runtime、.NET CLI、WinForms Demo、示例模型和文档，并生成 `package-files.sha256`。重新打包时会保留发布目录中的 `test` 文件夹，方便保留用户自己的测试图片。
 
+按后端拆分打包：
+
+```powershell
+.\scripts\package-win-x64.ps1 -Split
+```
+
+仅打包指定后端：
+
+```powershell
+.\scripts\package-win-x64.ps1 -Runtime opencv,directml
+```
+
 ## 公共 C API
 
 公共头文件位于 [ppocr_api.h](include/lw/ppocr/ppocr_api.h)，核心调用流程如下：
@@ -315,6 +327,11 @@ lw_ppocr_create
 
 所有由 DLL 返回的内存都必须使用对应的释放函数处理。不要跨模块直接 `delete` 或 `free`。
 
+## 代码示例
+
+- [C 示例](examples/c/)：`LoadLibrary` + `GetProcAddress` 动态加载，无外部依赖
+- [Python 示例](examples/python/)：`ctypes` 零依赖封装，支持 `with` 语句和 `run_file()`
+
 ## 目录结构
 
 ```text
@@ -324,10 +341,13 @@ src/loader/              lw.PPOCR.dll 和 Runtime 加载器
 src/runtime/             Runtime 私有接口
 src/runtimes/            四种后端实现
 bindings/dotnet/         .NET 封装、CLI 和 WinForms Demo
+examples/c/              C 语言示例（LoadLibrary 动态加载）
+examples/python/         Python ctypes 绑定示例
 models/                  模型清单、Schema 和体验模型
-tests/                   ABI、生命周期和后端集成测试
+tests/                   ABI、生命周期、golden 和后端集成测试
 docs/                    架构、迁移和 TensorRT 文档
 scripts/                 打包脚本
+.github/workflows/       CI 工作流
 ```
 
 ## 开源许可证

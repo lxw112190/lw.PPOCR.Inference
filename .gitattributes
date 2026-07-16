@@ -1,0 +1,30 @@
+# Default: auto-detect text files, normalize to LF in repo
+* text=auto
+
+# Windows-specific files — keep CRLF on checkout
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+*.sln text eol=crlf
+*.csproj text eol=crlf
+*.vcxproj text eol=crlf
+*.vcxproj.filters text eol=crlf
+*.rc text eol=crlf
+*.resx text eol=crlf
+*.settings text eol=crlf
+
+# Binary files — do not normalize
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.dll binary
+*.exe binary
+*.pdb binary
+*.lib binary
+*.exp binary
+*.ilk binary
+*.onnx binary
+*.engine binary
+*.zip binary
+*.7z binary

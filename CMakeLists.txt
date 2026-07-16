@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(lw.PPOCR.Inference VERSION 0.2.0 LANGUAGES C CXX)
+project(lw.PPOCR.Inference VERSION 1.0.0 LANGUAGES C CXX)
 
 if(NOT WIN32)
     message(FATAL_ERROR "The initial lw.PPOCR.Inference loader targets Windows.")
@@ -75,9 +75,18 @@ install(FILES third_party/clipper/LICENSE.txt
     RENAME clipper-BSL-1.0.txt
 )
 install(FILES
+    docs/abi-freeze-candidate.md
+    docs/abi-v1-stability.md
     docs/architecture.md
+    docs/compatibility-matrix.md
+    docs/license-audit.md
     docs/migration-roadmap.md
+    docs/model-manifest.md
     docs/performance-report.md
+    docs/releases/v1.0.0.md
+    docs/releases/v0.9.0-rc.1.md
+    docs/releases/v0.8.0.md
+    docs/releases/v0.3.0.md
     docs/releases/v0.2.0.md
     docs/releases/v0.1.0.md
     docs/stability-testing.md
@@ -88,6 +97,10 @@ install(FILES
 install(FILES models/model-manifest.schema.json DESTINATION models)
 install(DIRECTORY models/example/ DESTINATION models/example)
 install(DIRECTORY models/ppocrv6-tiny/ DESTINATION models/ppocrv6-tiny)
+install(DIRECTORY examples/ DESTINATION examples
+    PATTERN "*.pyc" EXCLUDE
+    PATTERN "__pycache__" EXCLUDE
+)
 
 if(MSVC)
     target_compile_options(lw_ppocr_core PRIVATE /W4 /permissive- /utf-8)

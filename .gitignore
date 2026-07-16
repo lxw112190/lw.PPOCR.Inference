@@ -22,6 +22,7 @@
 
 # Machine-specific TensorRT artifacts
 *.engine
+!models/**/*.engine
 
 # Downloaded SDK archives and extracted SDK directories
 *.zip

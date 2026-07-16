@@ -20,8 +20,8 @@ extern "C" {
 
 #define LW_PPOCR_API_VERSION 1u
 #define LW_PPOCR_ABI_FINGERPRINT UINT64_C(0x4C5750504F435201)
-#define LW_PPOCR_VERSION_MAJOR 0u
-#define LW_PPOCR_VERSION_MINOR 2u
+#define LW_PPOCR_VERSION_MAJOR 1u
+#define LW_PPOCR_VERSION_MINOR 0u
 #define LW_PPOCR_VERSION_PATCH 0u
 
 typedef struct lw_ppocr_engine* lw_ppocr_handle;

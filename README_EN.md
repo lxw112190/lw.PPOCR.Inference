@@ -28,9 +28,11 @@ Applications only change backend configuration when switching inference framewor
 - `Destroy` must not overlap inference. Finish all calls and free all results
   before destroying the engine.
 
-Version 0.2.0 adds lifecycle, 10,000-call sequential, eight-thread shared-engine,
-multiple-instance, and real-model stress coverage for all four backends. See
-[stability testing](docs/stability-testing.md) for commands and resource limits.
+Version 0.2.0 added lifecycle, concurrent, and real-model stress coverage for all
+four backends. Version 0.3.0 freezes the model manifest schema at v1 and adds a
+golden correctness test suite that verifies text, box coordinates, and confidence
+scores against a recorded baseline. See [stability testing](docs/stability-testing.md)
+for stress commands and resource limits.
 
 ## Backends
 
@@ -305,6 +307,23 @@ dist/lw.PPOCR.Inference-win-x64/
 
 The script publishes the Loader, Runtime plugins, .NET CLI, WinForms demo, sample model, licenses, and documentation. It also generates `package-files.sha256`. Repackaging preserves the `test` directory so local test images are not deleted.
 
+Split packages per backend:
+
+```powershell
+.\scripts\package-win-x64.ps1 -Split
+```
+
+Select specific backends only:
+
+```powershell
+.\scripts\package-win-x64.ps1 -Runtime opencv,directml
+```
+
+## Code examples
+
+- [C example](examples/c/) — `LoadLibrary` + `GetProcAddress`, zero external dependencies
+- [Python example](examples/python/) — `ctypes` wrapper with `with` statement and `run_file()`
+
 ## Public C API
 
 The public header is [ppocr_api.h](include/lw/ppocr/ppocr_api.h). The core lifecycle is:
@@ -327,10 +346,13 @@ src/loader/              lw.PPOCR.dll and Runtime discovery
 src/runtime/             Private Runtime contract
 src/runtimes/            Backend implementations
 bindings/dotnet/         .NET binding, CLI, and WinForms demo
+examples/c/              C language example (LoadLibrary dynamic loading)
+examples/python/         Python ctypes binding example
 models/                  Model manifests, schema, and experience model
-tests/                   ABI, lifecycle, and backend integration tests
+tests/                   ABI, lifecycle, golden, and backend integration tests
 docs/                    Architecture, migration, performance, and TensorRT docs
 scripts/                 Packaging scripts
+.github/workflows/       CI workflows
 ```
 
 ## License
