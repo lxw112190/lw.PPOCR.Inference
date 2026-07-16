@@ -14,16 +14,14 @@ concurrency:
 
 jobs:
   # ------------------------------------------------------------------
-  # Quick gate: VS preset build + ABI smoke + ABI stability + golden
-  # Runs on GitHub Windows runner — no GPU or vendor SDK required.
+  # VS preset build + ABI smoke + ABI stability
   # ------------------------------------------------------------------
   build-and-smoke:
     name: Build & ABI smoke (VS 2022)
     runs-on: windows-2022
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
@@ -42,49 +40,60 @@ jobs:
       - name: ABI stability test
         run: ctest --preset vs2022-x64-release -R lw.ppocr.abi.stability --output-on-failure
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-vs2022-x64
-          path: build/vs2022-x64/bin/
-          retention-days: 1
-
   # ------------------------------------------------------------------
-  # OpenCV DNN integration + golden correctness
+  # OpenCV DNN integration + golden correctness test
   # ------------------------------------------------------------------
   opencv-integration:
     name: OpenCV DNN integration & golden
     runs-on: windows-2022
-    needs: build-and-smoke
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-vs2022-x64
-          path: build/vs2022-x64/bin/
-
-      - name: Install OpenCV
-        run: |
-          $url = "https://github.com/opencv/opencv/releases/download/5.0.0/opencv-5.0.0-windows-x64-vc17.exe"
-          $installer = "${{ runner.temp }}\opencv.exe"
-          Invoke-WebRequest -Uri $url -OutFile $installer
-          Start-Process -FilePath $installer -ArgumentList @("-o${{ runner.temp }}\opencv", "-y") -Wait -NoNewWindow
-          echo "OpenCV_ROOT=${{ runner.temp }}\opencv\opencv\build" >> $env:GITHUB_ENV
+      - uses: actions/checkout@v4
 
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: amd64
 
+      - name: Cache OpenCV
+        id: opencv-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/opencv
+          key: opencv-5.0.0-windows-x64
+
+      - name: Download and extract OpenCV
+        if: steps.opencv-cache.outputs.cache-hit != 'true'
+        run: |
+          $url = "https://github.com/opencv/opencv/releases/download/5.0.0/opencv-5.0.0-windows.exe"
+          $installer = "${{ runner.temp }}\opencv-installer.exe"
+          Write-Host "Downloading OpenCV 5.0.0..."
+          Invoke-WebRequest -Uri $url -OutFile $installer -MaximumRetryCount 3 -RetryIntervalSec 10
+          Write-Host "Extracting..."
+          Start-Process -FilePath $installer -ArgumentList @("-o${{ runner.temp }}\opencv", "-y") -Wait -NoNewWindow
+          Write-Host "OpenCV extracted to ${{ runner.temp }}\opencv"
+
+      - name: Set OpenCV paths
+        run: |
+          $root = "${{ runner.temp }}\opencv\opencv\build"
+          if (-not (Test-Path "$root\OpenCVConfig.cmake")) {
+            # fallback: search one level deeper
+            $found = Get-ChildItem -Path "${{ runner.temp }}\opencv" -Filter "OpenCVConfig.cmake" -Recurse -Depth 3 |
+              Select-Object -First 1
+            if ($found) { $root = Split-Path -Parent $found.FullName }
+          }
+          echo "OpenCV_ROOT=$root" >> $env:GITHUB_ENV
+          echo "OpenCV_BIN=$root\x64\vc17\bin" >> $env:GITHUB_ENV
+          Write-Host "OpenCV_ROOT=$root"
+
       - name: Configure with OpenCV Runtime
         run: |
-          cmake -S . -B build/vs2022-x64-opencv -G "Visual Studio 17 2022" -A x64 `
+          cmake -S . -B build/ci-opencv -G "Visual Studio 17 2022" -A x64 `
             -DLW_PPOCR_BUILD_OPENCV_RUNTIME=ON `
             -DLW_PPOCR_OPENCV_ROOT="$env:OpenCV_ROOT" `
+            -DLW_PPOCR_BUILD_DIRECTML_RUNTIME=OFF `
+            -DLW_PPOCR_BUILD_OPENVINO_RUNTIME=OFF `
+            -DLW_PPOCR_BUILD_TENSORRT_RUNTIME=OFF `
             -DLW_PPOCR_BUILD_TESTS=ON `
             -DLW_PPOCR_BUILD_STUB_RUNTIME=ON `
             -DLW_PPOCR_TEST_DET_MODEL="${{ github.workspace }}/models/ppocrv6-tiny/det.onnx" `
@@ -94,18 +103,18 @@ jobs:
             -DLW_PPOCR_TEST_IMAGE="${{ github.workspace }}/models/ppocrv6-tiny/sample.jpg"
 
       - name: Build Release
-        run: cmake --build build/vs2022-x64-opencv --config Release
+        run: cmake --build build/ci-opencv --config Release
 
       - name: OpenCV integration test
         run: |
-          $env:PATH = "${{ github.workspace }}\build\vs2022-x64-opencv\bin\Release;$env:PATH"
-          ctest --test-dir build/vs2022-x64-opencv -C Release `
+          $env:PATH = "${{ github.workspace }}\build\ci-opencv\bin\Release;$env:OpenCV_BIN;$env:PATH"
+          ctest --test-dir build/ci-opencv -C Release `
             -R lw.ppocr.opencv.integration --output-on-failure
 
       - name: Golden correctness test
         run: |
-          $env:PATH = "${{ github.workspace }}\build\vs2022-x64-opencv\bin\Release;$env:PATH"
-          ctest --test-dir build/vs2022-x64-opencv -C Release `
+          $env:PATH = "${{ github.workspace }}\build\ci-opencv\bin\Release;$env:OpenCV_BIN;$env:PATH"
+          ctest --test-dir build/ci-opencv -C Release `
             -R lw.ppocr.golden --output-on-failure
 
   # ------------------------------------------------------------------
@@ -116,8 +125,7 @@ jobs:
     runs-on: windows-2022
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
