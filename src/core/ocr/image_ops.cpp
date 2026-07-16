@@ -1,5 +1,6 @@
 #include <lw/ppocr/core/image_ops.hpp>
 
+#include <opencv2/geometry/2d.hpp>
 #include <opencv2/imgproc.hpp>
 
 #include <algorithm>
