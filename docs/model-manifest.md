@@ -20,6 +20,7 @@ https://raw.githubusercontent.com/lxw112190/lw.PPOCR.Inference/main/models/model
 
 | Field | Type | Description |
 |---|---|---|
+| `$schema` | string (optional) | URI reference to the JSON Schema used to validate the manifest. |
 | `schema_version` | integer (const 1) | Manifest schema version. |
 | `name` | string | Human-readable model package name. |
 | `family` | string | Model family identifier (e.g. `"PP-OCRv6"`). |
@@ -130,6 +131,6 @@ Additional keys (e.g. `openvino`) can be added without changing the schema. The 
 ## Backward compatibility
 
 1. **Schema v1 fields are frozen.** New optional properties may be added. Existing required fields will stay required. Types and enum values will not narrow.
-2. **Runtime ignores unknown properties.** A manifest written for schema v2 will still load in a v1-aware Runtime, though the Runtime may ignore new fields.
+2. **Runtime ignores unknown properties within schema v1.** A manifest with an unsupported `schema_version` is rejected; future schema versions require explicit Runtime support.
 3. **Artifact keys are open-ended.** Adding a key like `"openvino"` does not require a schema update.
 4. **Coordinate systems** are top-left origin in image pixels, consistent with OpenCV conventions.

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(lw.PPOCR.Inference VERSION 1.0.0 LANGUAGES C CXX)
+project(lw.PPOCR.Inference VERSION 1.1.0 LANGUAGES C CXX)
 
 if(NOT WIN32)
     message(FATAL_ERROR "The initial lw.PPOCR.Inference loader targets Windows.")
@@ -20,6 +20,7 @@ option(LW_PPOCR_BUILD_OPENCV_RUNTIME "Build the OpenCV DNN Runtime" OFF)
 option(LW_PPOCR_BUILD_DIRECTML_RUNTIME "Build the ONNX Runtime DirectML Runtime" OFF)
 option(LW_PPOCR_BUILD_OPENVINO_RUNTIME "Build the OpenVINO Runtime" OFF)
 option(LW_PPOCR_BUILD_TENSORRT_RUNTIME "Build the TensorRT Runtime" OFF)
+option(LW_PPOCR_BUILD_HTTP_SERVICE "Build the HTTP API and Windows service host" ON)
 set(LW_PPOCR_OPENCV_ROOT "" CACHE PATH "OpenCV distribution root containing OpenCVConfig.cmake")
 set(LW_PPOCR_ONNXRUNTIME_DML_ROOT "" CACHE PATH "ONNX Runtime DirectML package root")
 set(LW_PPOCR_DIRECTML_DLL "" CACHE FILEPATH "DirectML.dll distributed with ONNX Runtime DirectML")
@@ -63,6 +64,10 @@ target_compile_definitions(lw_ppocr_loader
 )
 set_target_properties(lw_ppocr_loader PROPERTIES OUTPUT_NAME "lw.PPOCR")
 
+if(LW_PPOCR_BUILD_HTTP_SERVICE)
+    add_subdirectory(src/http_service)
+endif()
+
 install(TARGETS lw_ppocr_loader
     RUNTIME DESTINATION .
     LIBRARY DESTINATION .
@@ -74,6 +79,15 @@ install(FILES third_party/clipper/LICENSE.txt
     DESTINATION licenses
     RENAME clipper-BSL-1.0.txt
 )
+install(DIRECTORY third_party/licenses/ DESTINATION licenses)
+install(FILES third_party/cpp-httplib/LICENSE
+    DESTINATION licenses
+    RENAME cpp-httplib-MIT.txt
+)
+install(FILES third_party/nlohmann-json/LICENSE.MIT
+    DESTINATION licenses
+    RENAME nlohmann-json-MIT.txt
+)
 install(FILES
     docs/abi-freeze-candidate.md
     docs/abi-v1-stability.md
@@ -84,6 +98,7 @@ install(FILES
     docs/model-manifest.md
     docs/performance-report.md
     docs/releases/v1.0.0.md
+    docs/releases/v1.1.0.md
     docs/releases/v0.9.0-rc.1.md
     docs/releases/v0.8.0.md
     docs/releases/v0.3.0.md
@@ -91,6 +106,7 @@ install(FILES
     docs/releases/v0.1.0.md
     docs/stability-testing.md
     docs/tensorrt-engines.md
+    docs/http-service.md
     models/model-manifest.schema.json
     DESTINATION docs
 )

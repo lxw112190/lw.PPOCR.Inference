@@ -106,6 +106,19 @@ int main(int argc, char** argv) {
     }
     lw_ppocr_string_free(engine, json);
 
+    lw_ppocr_image crops[2] = {image, image};
+    lw_ppocr_recognition_result* recognition = nullptr;
+    if (lw_ppocr_recognize_batch(engine, crops, 2, &recognition) !=
+            LW_PPOCR_STATUS_OK || recognition == nullptr ||
+        recognition->item_count != 2 || recognition->items == nullptr ||
+        recognition->items[0].source_index != 0 ||
+        recognition->items[1].source_index != 1) {
+        const std::string error = LastError(engine);
+        lw_ppocr_destroy(&engine);
+        return Fail("recognition-only batch failed: " + error);
+    }
+    lw_ppocr_recognition_result_free(engine, recognition);
+
     lw_ppocr_destroy(&engine);
     if (engine != nullptr) {
         return Fail("destroy did not clear the handle");

@@ -31,5 +31,11 @@ struct PipelineResult {
     StageTiming pipeline;
 };
 
-}  // namespace lw::ppocr::core
+struct RecognitionResult {
+    std::vector<OcrRegion> items;
+    StageTiming classifier;
+    StageTiming recognizer;
+    StageTiming pipeline;
+};
 
+}  // namespace lw::ppocr::core

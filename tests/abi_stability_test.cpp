@@ -14,6 +14,17 @@
 
 namespace {
 
+static_assert(LW_PPOCR_VERSION_V1_SIZE == sizeof(lw_ppocr_version));
+static_assert(LW_PPOCR_CONFIG_V1_SIZE == sizeof(lw_ppocr_config));
+static_assert(LW_PPOCR_IMAGE_V1_SIZE == sizeof(lw_ppocr_image));
+static_assert(LW_PPOCR_RESULT_V1_SIZE == sizeof(lw_ppocr_result));
+static_assert(LW_PPOCR_CAPABILITIES_V1_SIZE ==
+    sizeof(lw_ppocr_capabilities));
+static_assert(LW_PPOCR_RECOGNITION_V1_1_SIZE ==
+    sizeof(lw_ppocr_recognition));
+static_assert(LW_PPOCR_RECOGNITION_RESULT_V1_1_SIZE ==
+    sizeof(lw_ppocr_recognition_result));
+
 constexpr int kLifecycleIterations = 1000;
 constexpr int kRunIterations = 10000;
 constexpr int kThreadCount = 8;
@@ -91,6 +102,22 @@ bool RunOnce(lw_ppocr_handle engine, const lw_ppocr_image& image) {
     return true;
 }
 
+bool RecognizeOnce(lw_ppocr_handle engine, const lw_ppocr_image& image) {
+    lw_ppocr_recognition_result* result = nullptr;
+    const lw_ppocr_status status = lw_ppocr_recognize(
+        engine, &image, &result);
+    if (status != LW_PPOCR_STATUS_OK || result == nullptr ||
+        result->item_count != 1 || result->items == nullptr ||
+        result->items[0].source_index != 0) {
+        if (result != nullptr) {
+            lw_ppocr_recognition_result_free(engine, result);
+        }
+        return false;
+    }
+    lw_ppocr_recognition_result_free(engine, result);
+    return true;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -147,6 +174,10 @@ int main(int argc, char** argv) {
                 return Fail("JSON allocation stress failed");
             }
             lw_ppocr_string_free(engine, json);
+            if (!RecognizeOnce(engine, image)) {
+                lw_ppocr_destroy(&engine);
+                return Fail("recognition allocation stress failed");
+            }
         }
     }
 

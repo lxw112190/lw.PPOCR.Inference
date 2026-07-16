@@ -5,6 +5,7 @@
 #include <cstring>
 #include <new>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -13,6 +14,11 @@ struct StubEngine {
     lw_ppocr_log_level log_level = LW_PPOCR_LOG_OFF;
     lw_ppocr_log_callback log_callback = nullptr;
     void* log_user_data = nullptr;
+};
+
+struct StubRecognitionResult {
+    lw_ppocr_recognition_result value{};
+    std::vector<lw_ppocr_recognition> items;
 };
 
 thread_local std::string g_last_error;
@@ -104,6 +110,51 @@ void LW_PPOCR_CALL ResultFree(void*, lw_ppocr_result* result) {
     std::free(result);
 }
 
+lw_ppocr_status LW_PPOCR_CALL RecognizeBatch(
+    void* runtime_handle, const lw_ppocr_image*, uint64_t image_count,
+    lw_ppocr_recognition_result** result) {
+    if (runtime_handle == nullptr || image_count == 0 || result == nullptr) {
+        g_last_error = "Stub Runtime received an invalid recognition request";
+        return LW_PPOCR_STATUS_INVALID_ARGUMENT;
+    }
+    *result = nullptr;
+    auto* owned = new (std::nothrow) StubRecognitionResult();
+    if (owned == nullptr) {
+        g_last_error = "Stub Runtime failed to allocate a recognition result";
+        return LW_PPOCR_STATUS_OUT_OF_MEMORY;
+    }
+    try {
+        owned->items.resize(static_cast<size_t>(image_count));
+    } catch (...) {
+        delete owned;
+        g_last_error = "Stub Runtime failed to allocate recognition items";
+        return LW_PPOCR_STATUS_OUT_OF_MEMORY;
+    }
+    for (size_t index = 0; index < owned->items.size(); ++index) {
+        owned->items[index].struct_size = sizeof(lw_ppocr_recognition);
+        owned->items[index].api_version = LW_PPOCR_API_VERSION;
+        owned->items[index].source_index = static_cast<uint64_t>(index);
+        owned->items[index].text_utf8 = "";
+        owned->items[index].cls_label = -1;
+    }
+    owned->value.struct_size = sizeof(lw_ppocr_recognition_result);
+    owned->value.api_version = LW_PPOCR_API_VERSION;
+    owned->value.item_count = image_count;
+    owned->value.items = owned->items.data();
+    owned->value.reserved_ptr[0] = owned;
+    *result = &owned->value;
+    g_last_error.clear();
+    return LW_PPOCR_STATUS_OK;
+}
+
+void LW_PPOCR_CALL RecognitionResultFree(
+    void*, lw_ppocr_recognition_result* result) {
+    if (result != nullptr) {
+        delete static_cast<StubRecognitionResult*>(
+            const_cast<void*>(result->reserved_ptr[0]));
+    }
+}
+
 void LW_PPOCR_CALL StringFree(void*, char* value) {
     std::free(value);
 }
@@ -112,7 +163,7 @@ lw_ppocr_status LW_PPOCR_CALL GetCapabilities(
     void* runtime_handle,
     lw_ppocr_capabilities* capabilities) {
     if (runtime_handle == nullptr || capabilities == nullptr ||
-        capabilities->struct_size < sizeof(lw_ppocr_capabilities)) {
+        capabilities->struct_size < LW_PPOCR_CAPABILITIES_V1_SIZE) {
         g_last_error = "Stub Runtime received invalid capabilities storage";
         return LW_PPOCR_STATUS_INVALID_ARGUMENT;
     }
@@ -144,8 +195,29 @@ void LW_PPOCR_CALL Destroy(void** runtime_handle) {
     g_last_error.clear();
 }
 
+#if defined(LW_PPOCR_STUB_FORWARD_COMPAT)
+constexpr uint32_t kAdvertisedRuntimeApiSize =
+    static_cast<uint32_t>(sizeof(lw_ppocr_runtime_api) + 16);
+constexpr uint32_t kAdvertisedConfigSize =
+    static_cast<uint32_t>(sizeof(lw_ppocr_config) + 16);
+constexpr uint32_t kAdvertisedImageSize =
+    static_cast<uint32_t>(sizeof(lw_ppocr_image) + 16);
+constexpr uint32_t kAdvertisedResultSize =
+    static_cast<uint32_t>(sizeof(lw_ppocr_result) + 16);
+constexpr uint32_t kAdvertisedCapabilitiesSize =
+    static_cast<uint32_t>(sizeof(lw_ppocr_capabilities) + 16);
+constexpr uint64_t kAdvertisedFingerprint = LW_PPOCR_ABI_FINGERPRINT + 1;
+#else
+constexpr uint32_t kAdvertisedRuntimeApiSize = sizeof(lw_ppocr_runtime_api);
+constexpr uint32_t kAdvertisedConfigSize = sizeof(lw_ppocr_config);
+constexpr uint32_t kAdvertisedImageSize = sizeof(lw_ppocr_image);
+constexpr uint32_t kAdvertisedResultSize = sizeof(lw_ppocr_result);
+constexpr uint32_t kAdvertisedCapabilitiesSize = sizeof(lw_ppocr_capabilities);
+constexpr uint64_t kAdvertisedFingerprint = LW_PPOCR_ABI_FINGERPRINT;
+#endif
+
 const lw_ppocr_runtime_api kRuntimeApi = {
-    sizeof(lw_ppocr_runtime_api),
+    kAdvertisedRuntimeApiSize,
     LW_PPOCR_RUNTIME_API_VERSION,
     "lw.PPOCR Contract Test Stub",
     &Create,
@@ -156,11 +228,15 @@ const lw_ppocr_runtime_api kRuntimeApi = {
     &GetCapabilities,
     &GetLastError,
     &Destroy,
-    static_cast<uint32_t>(sizeof(lw_ppocr_config)),
-    static_cast<uint32_t>(sizeof(lw_ppocr_image)),
-    static_cast<uint32_t>(sizeof(lw_ppocr_result)),
-    static_cast<uint32_t>(sizeof(lw_ppocr_capabilities)),
-    LW_PPOCR_ABI_FINGERPRINT
+    kAdvertisedConfigSize,
+    kAdvertisedImageSize,
+    kAdvertisedResultSize,
+    kAdvertisedCapabilitiesSize,
+    kAdvertisedFingerprint,
+    &RecognizeBatch,
+    &RecognitionResultFree,
+    static_cast<uint32_t>(sizeof(lw_ppocr_recognition)),
+    static_cast<uint32_t>(sizeof(lw_ppocr_recognition_result))
 };
 
 }  // namespace

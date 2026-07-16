@@ -1,0 +1,34 @@
+#include <windows.h>
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 1,1,0,0
+ PRODUCTVERSION 1,1,0,0
+ FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+ FILEFLAGS VS_FF_DEBUG
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "080404B0"
+        BEGIN
+            VALUE "CompanyName", "lw"
+            VALUE "FileDescription", "lw.PPOCR HTTP OCR and Windows service"
+            VALUE "FileVersion", "1.1.0"
+            VALUE "InternalName", "lw.PPOCR.HttpService.exe"
+            VALUE "LegalCopyright", "Copyright (C) lw"
+            VALUE "OriginalFilename", "lw.PPOCR.HttpService.exe"
+            VALUE "ProductName", "lw.PPOCR.Inference"
+            VALUE "ProductVersion", "1.1.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0804, 1200
+    END
+END

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 
 #if defined(_WIN32)
@@ -19,9 +20,13 @@ extern "C" {
 #endif
 
 #define LW_PPOCR_API_VERSION 1u
-#define LW_PPOCR_ABI_FINGERPRINT UINT64_C(0x4C5750504F435201)
+#define LW_PPOCR_ABI_FINGERPRINT_FAMILY UINT64_C(0x4C5750504F435200)
+#define LW_PPOCR_ABI_FINGERPRINT_FAMILY_MASK UINT64_C(0xFFFFFFFFFFFFFF00)
+#define LW_PPOCR_ABI_FINGERPRINT_V1 UINT64_C(0x4C5750504F435201)
+#define LW_PPOCR_ABI_FINGERPRINT_V1_1 UINT64_C(0x4C5750504F435202)
+#define LW_PPOCR_ABI_FINGERPRINT LW_PPOCR_ABI_FINGERPRINT_V1_1
 #define LW_PPOCR_VERSION_MAJOR 1u
-#define LW_PPOCR_VERSION_MINOR 0u
+#define LW_PPOCR_VERSION_MINOR 1u
 #define LW_PPOCR_VERSION_PATCH 0u
 
 typedef struct lw_ppocr_engine* lw_ppocr_handle;
@@ -29,7 +34,8 @@ typedef struct lw_ppocr_engine* lw_ppocr_handle;
 /*
  * Threading contract:
  * - Separate handles are independent and may be used concurrently.
- * - Calls to run/run_json on one handle are safe and may be serialized by the Runtime.
+ * - Calls to run/run_json/recognize/recognize_batch on one handle are safe and
+ *   may be serialized by the Runtime.
  * - A result or string must be freed with the same handle that created it.
  * - Destroy is not concurrent: finish all calls and free all results before destroy.
  */
@@ -171,6 +177,30 @@ typedef struct lw_ppocr_result {
     const void* reserved_ptr[4];
 } lw_ppocr_result;
 
+typedef struct lw_ppocr_recognition {
+    uint32_t struct_size;
+    uint32_t api_version;
+    uint64_t source_index;
+    const char* text_utf8;
+    float score;
+    int32_t cls_label;
+    float cls_score;
+    int32_t reserved_i32[4];
+    const void* reserved_ptr[2];
+} lw_ppocr_recognition;
+
+typedef struct lw_ppocr_recognition_result {
+    uint32_t struct_size;
+    uint32_t api_version;
+    uint64_t item_count;
+    const lw_ppocr_recognition* items;
+    lw_ppocr_timing classifier;
+    lw_ppocr_timing recognizer;
+    lw_ppocr_timing pipeline;
+    int32_t reserved_i32[8];
+    const void* reserved_ptr[4];
+} lw_ppocr_recognition_result;
+
 typedef struct lw_ppocr_capabilities {
     uint32_t struct_size;
     uint32_t api_version;
@@ -183,6 +213,20 @@ typedef struct lw_ppocr_capabilities {
     int32_t supports_cls;
     int32_t reserved_i32[8];
 } lw_ppocr_capabilities;
+
+/*
+ * Frozen ABI v1 prefix sizes. Future append-only fields must not change these
+ * values. Implementations accept structures at least this large and ignore
+ * fields beyond the prefix they understand.
+ */
+#define LW_PPOCR_VERSION_V1_SIZE ((uint32_t)(offsetof(lw_ppocr_version, version_utf8) + sizeof(const char*)))
+#define LW_PPOCR_CONFIG_V1_SIZE ((uint32_t)(offsetof(lw_ppocr_config, reserved_ptr) + sizeof(((lw_ppocr_config*)0)->reserved_ptr)))
+#define LW_PPOCR_IMAGE_V1_SIZE ((uint32_t)(offsetof(lw_ppocr_image, reserved_i32) + sizeof(((lw_ppocr_image*)0)->reserved_i32)))
+#define LW_PPOCR_RESULT_V1_SIZE ((uint32_t)(offsetof(lw_ppocr_result, reserved_ptr) + sizeof(((lw_ppocr_result*)0)->reserved_ptr)))
+#define LW_PPOCR_RECOGNITION_V1_1_SIZE ((uint32_t)(offsetof(lw_ppocr_recognition, reserved_ptr) + sizeof(((lw_ppocr_recognition*)0)->reserved_ptr)))
+#define LW_PPOCR_RECOGNITION_RESULT_V1_1_SIZE ((uint32_t)(offsetof(lw_ppocr_recognition_result, reserved_ptr) + sizeof(((lw_ppocr_recognition_result*)0)->reserved_ptr)))
+#define LW_PPOCR_CAPABILITIES_V1_END (offsetof(lw_ppocr_capabilities, reserved_i32) + sizeof(((lw_ppocr_capabilities*)0)->reserved_i32))
+#define LW_PPOCR_CAPABILITIES_V1_SIZE ((uint32_t)((LW_PPOCR_CAPABILITIES_V1_END + sizeof(void*) - 1) & ~(sizeof(void*) - 1)))
 
 LW_PPOCR_API lw_ppocr_status LW_PPOCR_CALL lw_ppocr_get_version(
     lw_ppocr_version* version);
@@ -202,9 +246,29 @@ LW_PPOCR_API lw_ppocr_status LW_PPOCR_CALL lw_ppocr_run_json(
     char** json_utf8,
     uint64_t* json_length);
 
+/* Recognizes an already-cropped text-line image without running detection. */
+LW_PPOCR_API lw_ppocr_status LW_PPOCR_CALL lw_ppocr_recognize(
+    lw_ppocr_handle handle,
+    const lw_ppocr_image* cropped_image,
+    lw_ppocr_recognition_result** result);
+
+/*
+ * Recognizes already-cropped text-line images as one ordered batch. The result
+ * always uses source_index to map an item back to the input image array.
+ */
+LW_PPOCR_API lw_ppocr_status LW_PPOCR_CALL lw_ppocr_recognize_batch(
+    lw_ppocr_handle handle,
+    const lw_ppocr_image* cropped_images,
+    uint64_t image_count,
+    lw_ppocr_recognition_result** result);
+
 LW_PPOCR_API void LW_PPOCR_CALL lw_ppocr_result_free(
     lw_ppocr_handle handle,
     lw_ppocr_result* result);
+
+LW_PPOCR_API void LW_PPOCR_CALL lw_ppocr_recognition_result_free(
+    lw_ppocr_handle handle,
+    lw_ppocr_recognition_result* result);
 
 LW_PPOCR_API void LW_PPOCR_CALL lw_ppocr_string_free(
     lw_ppocr_handle handle,

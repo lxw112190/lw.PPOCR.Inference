@@ -27,6 +27,16 @@ if(TARGET lw_ppocr_runtime_stub)
         NAME lw.ppocr.abi.stability
         COMMAND lw_ppocr_abi_stability_test $<TARGET_FILE:lw_ppocr_runtime_stub>
     )
+    if(TARGET lw_ppocr_runtime_stub_forward)
+        add_test(
+            NAME lw.ppocr.abi.forward_compatibility
+            COMMAND lw_ppocr_abi_smoke_test
+                $<TARGET_FILE:lw_ppocr_runtime_stub_forward>
+        )
+        set_tests_properties(lw.ppocr.abi.forward_compatibility PROPERTIES
+            LABELS "abi"
+        )
+    endif()
     set_tests_properties(lw.ppocr.abi.stability PROPERTIES LABELS "stability")
 endif()
 

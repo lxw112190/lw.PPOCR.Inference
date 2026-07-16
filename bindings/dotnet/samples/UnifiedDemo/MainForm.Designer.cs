@@ -246,7 +246,7 @@ partial class MainForm
         imageHintLabel.AutoSize = true;
         imageHintLabel.ForeColor = Color.FromArgb(100, 106, 110);
         imageHintLabel.Margin = new Padding(14, 8, 0, 0);
-        imageHintLabel.Text = "支持 JPG / PNG / BMP，可直接拖入图片";
+        imageHintLabel.Text = "支持 JPG / PNG / BMP；鼠标拖拽框选区域可直接识别";
         imageView.Dock = DockStyle.Fill;
 
         resultPanel.BackColor = Color.White;

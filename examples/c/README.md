@@ -5,7 +5,8 @@ Minimal C program demonstrating the `lw.PPOCR.Inference` public C ABI.
 ## What it shows
 
 - `LoadLibrary` / `GetProcAddress` — no import library needed
-- `lw_ppocr_create` → `lw_ppocr_run` → `lw_ppocr_result_free` → `lw_ppocr_destroy`
+- full OCR: `lw_ppocr_run` → `lw_ppocr_result_free`
+- cropped text recognition: `lw_ppocr_recognize_batch` → `lw_ppocr_recognition_result_free`
 - Error retrieval via `lw_ppocr_get_last_error`
 - Memory ownership rules (free results before destroying engine)
 

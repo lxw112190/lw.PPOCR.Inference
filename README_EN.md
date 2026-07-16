@@ -4,6 +4,8 @@
 
 `lw.PPOCR.Inference` is a unified PP-OCR inference project for Windows. It exposes one stable C ABI and isolates OpenCV DNN, ONNX Runtime DirectML, OpenVINO, and TensorRT as independent Runtime plugins.
 
+The current stable release is **v1.1.0**. API v1 and its ABI are frozen. v1.1.0 adds recognition-only calls, the HTTP service, and interactive demos without breaking v1.0.0 callers. See the [v1.1.0 release notes](docs/releases/v1.1.0.md).
+
 Applications only change backend configuration when switching inference frameworks. They do not need to rewrite the OCR workflow. In addition to C#, any language capable of calling a C DLL can integrate with the project, including C, C++, Python, Java, Delphi, Go, and Rust.
 
 ## Features
@@ -12,9 +14,11 @@ Applications only change backend configuration when switching inference framewor
 - A language-neutral C ABI that does not expose STL, `cv::Mat`, C++ classes, exceptions, or compiler-specific types
 - Isolated Runtime dependencies that avoid DLL conflicts
 - Complete text detection, direction classification, and text recognition pipeline
+- Single and batched recognition-only calls for pre-cropped text-line images
 - Structured results, JSON results, quadrilateral boxes, confidence scores, and per-stage timings
 - BGR, RGB, BGRA, RGBA, and grayscale image inputs
 - .NET binding, unified CLI, and WinForms demo
+- JSON + Base64 HTTP API, browser test page, and Windows Service mode
 - Model packages described by `model.json`, without hard-coded artifact names
 - Instance-owned configuration, workers, and memory with explicit initialization and destruction
 
@@ -29,10 +33,9 @@ Applications only change backend configuration when switching inference framewor
   before destroying the engine.
 
 Version 0.2.0 added lifecycle, concurrent, and real-model stress coverage for all
-four backends. Version 0.3.0 freezes the model manifest schema at v1 and adds a
-golden correctness test suite that verifies text, box coordinates, and confidence
-scores against a recorded baseline. See [stability testing](docs/stability-testing.md)
-for stress commands and resource limits.
+four backends. Version 0.3.0 froze the model manifest schema at v1 and added a
+golden correctness suite. Version 1.0.0 formally froze API v1 and its ABI. See
+[stability testing](docs/stability-testing.md) for stress commands and resource limits.
 
 ## Backends
 
@@ -68,10 +71,11 @@ This layout prevents OpenCV, ONNX Runtime, OpenVINO, CUDA, and TensorRT librarie
 
 ## Quick Start
 
-The Windows package provides two applications:
+The Windows package provides three applications:
 
-- `lw.PPOCR.Demo.exe`: WinForms graphical demo
-- `lw.PPOCR.Cli.exe`: backend-neutral command-line program
+- `lw.PPOCR.Demo.exe`: .NET Framework 4.7.2 WinForms graphical demo
+- `lw.PPOCR.Cli.exe`: .NET 8 backend-neutral command-line program
+- `lw.PPOCR.HttpService.exe`: native HTTP API and Windows Service host
 
 To use the demo:
 
@@ -81,8 +85,11 @@ To use the demo:
 4. Enable **Direction classification CLS** when required.
 5. Select **Initialize**, choose an image, and select **Recognize**.
 6. View structured or plain-text results and copy the recognized text.
+7. Drag a rectangle over a text region in the image. Releasing the mouse skips detection and immediately recognizes the selected crop.
 
 Relative model and Runtime paths in the demo are resolved from the EXE directory, independently of the process working directory. `MainForm` uses the standard WinForms Designer layout and can be edited directly in Visual Studio.
+
+Per-backend split packages preselect their included backend and carry the sample model. Run `run-http-service.cmd` for the local HTTP API and browser test page, or `install-service.cmd` to install an automatically started Windows service with administrator approval. See [HTTP API and Windows Service](docs/http-service.md).
 
 ## CLI Examples
 
@@ -313,6 +320,24 @@ Split packages per backend:
 .\scripts\package-win-x64.ps1 -Split
 ```
 
+Each backend package includes a lightweight .NET Framework 4.7.2 WinForms demo, the sample model, the native HTTP service, browser test page, and Windows Service install/uninstall scripts.
+
+Create the official unified ZIP and SHA-256 file:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\package-win-x64.ps1 -Archive
+```
+
+Create versioned ZIP and SHA-256 files for the core and all four backend packages:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\package-win-x64.ps1 -Split -Archive
+```
+
+Release attachments are written to `dist/releases/v1.1.0/`.
+
 Select specific backends only:
 
 ```powershell
@@ -332,8 +357,14 @@ The public header is [ppocr_api.h](include/lw/ppocr/ppocr_api.h). The core lifec
 lw_ppocr_create
     -> lw_ppocr_run / lw_ppocr_run_json
         -> lw_ppocr_result_free / lw_ppocr_string_free
+    -> lw_ppocr_recognize / lw_ppocr_recognize_batch
+        -> lw_ppocr_recognition_result_free
     -> lw_ppocr_destroy
 ```
+
+`lw_ppocr_recognize_batch` skips detection and preserves input order through
+`source_index`. Direction classification remains controlled by `enable_cls`.
+These are append-only v1.1.0 additions; the API version remains 1.
 
 Memory returned by the DLL must be released with its corresponding API function. Do not call `delete` or `free` across module boundaries.
 
@@ -361,10 +392,17 @@ scripts/                 Packaging scripts
 
 Clipper 6.4.2 under `third_party/clipper` was developed by Angus Johnson and is distributed under the Boost Software License 1.0. Its license is stored at `third_party/clipper/LICENSE.txt` in the source tree and `licenses/clipper-BSL-1.0.txt` in the Windows package. Other third-party components remain subject to their respective licenses and distribution terms.
 
+Windows packages also carry license or third-party notice materials for OpenCV,
+ONNX Runtime, DirectML, OpenVINO, TensorRT, CUDA, cpp-httplib, nlohmann/json, and the PP-OCR model artifacts
+under `licenses/`. TensorRT and CUDA components are provided by NVIDIA
+Corporation; their use and redistribution are subject to the referenced or
+included NVIDIA agreements. Use a split package without NVIDIA components if
+you do not accept those terms.
+
 ## Project Status
 
 All four production Runtimes have passed end-to-end tests with real models. The unified Loader, C ABI, .NET binding, CLI, WinForms demo, benchmark mode, and Windows packaging workflow are operational.
 
 See the [performance report](docs/performance-report.md) for the test hardware, SDK versions, model and image hashes, parameters, and multi-run statistics for all four backends.
 
-The project is currently pre-1.0. Public interfaces may still change before API v1 is frozen. After that point, changes will favor additive fields and structure-size versioning to preserve backward compatibility.
+The current stable release is **v1.1.0**. `LW_PPOCR_API_VERSION` remains `1`, and the v1.0.0 ABI freeze remains in force. Future v1.x releases preserve compatibility through new functions, append-only structure fields, and `struct_size` negotiation.

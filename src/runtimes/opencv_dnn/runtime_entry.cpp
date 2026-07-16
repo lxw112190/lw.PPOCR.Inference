@@ -1,6 +1,7 @@
 #include "opencv_engine.hpp"
 
 #include <lw/ppocr/runtime_api.h>
+#include <lw/ppocr/runtime_result.hpp>
 
 #include <opencv2/core.hpp>
 
@@ -222,6 +223,29 @@ lw_ppocr_status LW_PPOCR_CALL RunJson(
     }, "run OpenCV DNN JSON inference");
 }
 
+lw_ppocr_status LW_PPOCR_CALL RecognizeBatch(
+    void* runtime_handle, const lw_ppocr_image* images, uint64_t image_count,
+    lw_ppocr_recognition_result** result) {
+    if (runtime_handle == nullptr || images == nullptr || image_count == 0 ||
+        result == nullptr) {
+        g_last_error = "OpenCV DNN recognition received invalid arguments";
+        return LW_PPOCR_STATUS_INVALID_ARGUMENT;
+    }
+    *result = nullptr;
+    return Guard([&]() {
+        auto* engine = static_cast<OpenCvOcrEngine*>(runtime_handle);
+        auto owned = lw::ppocr::runtime::ToNativeRecognitionResult(
+            engine->RecognizeBatch(images, image_count));
+        *result = &owned->value;
+        owned.release();
+    }, "run OpenCV DNN recognition-only inference");
+}
+
+void LW_PPOCR_CALL RecognitionResultFree(
+    void*, lw_ppocr_recognition_result* result) {
+    lw::ppocr::runtime::FreeRecognitionResult(result);
+}
+
 void LW_PPOCR_CALL ResultFree(void*, lw_ppocr_result* result) {
     if (result == nullptr) {
         return;
@@ -238,7 +262,7 @@ lw_ppocr_status LW_PPOCR_CALL GetCapabilities(
     void* runtime_handle,
     lw_ppocr_capabilities* capabilities) {
     if (runtime_handle == nullptr || capabilities == nullptr ||
-        capabilities->struct_size < sizeof(lw_ppocr_capabilities)) {
+        capabilities->struct_size < LW_PPOCR_CAPABILITIES_V1_SIZE) {
         g_last_error = "OpenCV DNN capabilities received invalid arguments";
         return LW_PPOCR_STATUS_INVALID_ARGUMENT;
     }
@@ -284,7 +308,11 @@ const lw_ppocr_runtime_api kRuntimeApi = {
     static_cast<uint32_t>(sizeof(lw_ppocr_image)),
     static_cast<uint32_t>(sizeof(lw_ppocr_result)),
     static_cast<uint32_t>(sizeof(lw_ppocr_capabilities)),
-    LW_PPOCR_ABI_FINGERPRINT
+    LW_PPOCR_ABI_FINGERPRINT,
+    &RecognizeBatch,
+    &RecognitionResultFree,
+    static_cast<uint32_t>(sizeof(lw_ppocr_recognition)),
+    static_cast<uint32_t>(sizeof(lw_ppocr_recognition_result))
 };
 
 }  // namespace

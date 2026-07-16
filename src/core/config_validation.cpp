@@ -32,7 +32,7 @@ lw_ppocr_status ValidateConfig(const lw_ppocr_config* config, std::string& error
         error = "config is null";
         return LW_PPOCR_STATUS_INVALID_ARGUMENT;
     }
-    if (config->struct_size < sizeof(lw_ppocr_config)) {
+    if (config->struct_size < LW_PPOCR_CONFIG_V1_SIZE) {
         error = "config struct_size is smaller than the API v1 structure";
         return LW_PPOCR_STATUS_INVALID_ARGUMENT;
     }
@@ -67,7 +67,7 @@ lw_ppocr_status ValidateImage(const lw_ppocr_image* image, std::string& error) {
         error = "image or image data is null";
         return LW_PPOCR_STATUS_INVALID_ARGUMENT;
     }
-    if (image->struct_size < sizeof(lw_ppocr_image) ||
+    if (image->struct_size < LW_PPOCR_IMAGE_V1_SIZE ||
         image->api_version != LW_PPOCR_API_VERSION) {
         error = "image structure is incompatible with API v1";
         return LW_PPOCR_STATUS_INVALID_ARGUMENT;

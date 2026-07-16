@@ -150,23 +150,35 @@ std::string RuntimeLastError(lw_ppocr_handle handle) {
 
 bool RuntimeApiIsComplete(const lw_ppocr_runtime_api* api) noexcept {
     return api != nullptr &&
-        api->struct_size >= sizeof(lw_ppocr_runtime_api) &&
+        api->struct_size >= LW_PPOCR_RUNTIME_API_V1_SIZE &&
         api->api_version == LW_PPOCR_RUNTIME_API_VERSION &&
         api->create != nullptr && api->run != nullptr &&
         api->run_json != nullptr && api->result_free != nullptr &&
         api->string_free != nullptr && api->get_capabilities != nullptr &&
         api->get_last_error != nullptr && api->destroy != nullptr &&
-        api->public_config_size == sizeof(lw_ppocr_config) &&
-        api->public_image_size == sizeof(lw_ppocr_image) &&
-        api->public_result_size == sizeof(lw_ppocr_result) &&
-        api->public_capabilities_size == sizeof(lw_ppocr_capabilities) &&
-        api->public_abi_fingerprint == LW_PPOCR_ABI_FINGERPRINT;
+        api->public_config_size >= LW_PPOCR_CONFIG_V1_SIZE &&
+        api->public_image_size >= LW_PPOCR_IMAGE_V1_SIZE &&
+        api->public_result_size >= LW_PPOCR_RESULT_V1_SIZE &&
+        api->public_capabilities_size >= LW_PPOCR_CAPABILITIES_V1_SIZE &&
+        (api->public_abi_fingerprint & LW_PPOCR_ABI_FINGERPRINT_FAMILY_MASK) ==
+            LW_PPOCR_ABI_FINGERPRINT_FAMILY &&
+        api->public_abi_fingerprint >= LW_PPOCR_ABI_FINGERPRINT_V1;
+}
+
+bool RuntimeSupportsRecognition(const lw_ppocr_runtime_api* api) noexcept {
+    return api != nullptr &&
+        api->struct_size >= LW_PPOCR_RUNTIME_API_V1_1_SIZE &&
+        api->recognize_batch != nullptr &&
+        api->recognition_result_free != nullptr &&
+        api->public_recognition_size >= LW_PPOCR_RECOGNITION_V1_1_SIZE &&
+        api->public_recognition_result_size >=
+            LW_PPOCR_RECOGNITION_RESULT_V1_1_SIZE;
 }
 
 }  // namespace
 
 lw_ppocr_status LW_PPOCR_CALL lw_ppocr_get_version(lw_ppocr_version* version) {
-    if (version == nullptr || version->struct_size < sizeof(lw_ppocr_version)) {
+    if (version == nullptr || version->struct_size < LW_PPOCR_VERSION_V1_SIZE) {
         SetLastError("version structure is null or too small");
         return LW_PPOCR_STATUS_INVALID_ARGUMENT;
     }
@@ -176,7 +188,7 @@ lw_ppocr_status LW_PPOCR_CALL lw_ppocr_get_version(lw_ppocr_version* version) {
     version->minor = LW_PPOCR_VERSION_MINOR;
     version->patch = LW_PPOCR_VERSION_PATCH;
     version->product_name_utf8 = "lw.PPOCR.Inference";
-    version->version_utf8 = "1.0.0";
+    version->version_utf8 = "1.1.0";
     ClearLastError();
     return LW_PPOCR_STATUS_OK;
 }
@@ -333,11 +345,73 @@ lw_ppocr_status LW_PPOCR_CALL lw_ppocr_run_json(
     return status;
 }
 
+lw_ppocr_status LW_PPOCR_CALL lw_ppocr_recognize(
+    lw_ppocr_handle handle,
+    const lw_ppocr_image* cropped_image,
+    lw_ppocr_recognition_result** result) {
+    return lw_ppocr_recognize_batch(handle, cropped_image, 1, result);
+}
+
+lw_ppocr_status LW_PPOCR_CALL lw_ppocr_recognize_batch(
+    lw_ppocr_handle handle,
+    const lw_ppocr_image* cropped_images,
+    uint64_t image_count,
+    lw_ppocr_recognition_result** result) {
+    if (result == nullptr) {
+        SetLastError("recognition result output is null");
+        return LW_PPOCR_STATUS_INVALID_ARGUMENT;
+    }
+    *result = nullptr;
+    if (handle == nullptr || cropped_images == nullptr || image_count == 0) {
+        SetLastError("engine, cropped images, or image_count is invalid");
+        return LW_PPOCR_STATUS_INVALID_ARGUMENT;
+    }
+    if (image_count > static_cast<uint64_t>(SIZE_MAX / sizeof(lw_ppocr_image))) {
+        SetLastError("image_count is too large");
+        return LW_PPOCR_STATUS_INVALID_ARGUMENT;
+    }
+    if (!RuntimeSupportsRecognition(handle->runtime_api)) {
+        SetLastError("Runtime does not support recognition-only inference");
+        return LW_PPOCR_STATUS_UNSUPPORTED;
+    }
+    for (uint64_t index = 0; index < image_count; ++index) {
+        std::string validation_error;
+        const lw_ppocr_status validation = lw::ppocr::core::ValidateImage(
+            &cropped_images[index], validation_error);
+        if (validation != LW_PPOCR_STATUS_OK) {
+            SetLastError("cropped image " + std::to_string(index) + ": " +
+                validation_error);
+            return validation;
+        }
+    }
+
+    const lw_ppocr_status status = handle->runtime_api->recognize_batch(
+        handle->runtime_handle, cropped_images, image_count, result);
+    if (status == LW_PPOCR_STATUS_OK) {
+        ClearLastError();
+    } else {
+        const std::string runtime_error = RuntimeLastError(handle);
+        SetLastError(runtime_error.empty()
+            ? "Runtime recognition-only inference failed" : runtime_error);
+    }
+    return status;
+}
+
 void LW_PPOCR_CALL lw_ppocr_result_free(
     lw_ppocr_handle handle,
     lw_ppocr_result* result) {
     if (handle != nullptr && result != nullptr) {
         handle->runtime_api->result_free(handle->runtime_handle, result);
+    }
+}
+
+void LW_PPOCR_CALL lw_ppocr_recognition_result_free(
+    lw_ppocr_handle handle,
+    lw_ppocr_recognition_result* result) {
+    if (handle != nullptr && result != nullptr &&
+        RuntimeSupportsRecognition(handle->runtime_api)) {
+        handle->runtime_api->recognition_result_free(
+            handle->runtime_handle, result);
     }
 }
 
@@ -351,7 +425,7 @@ lw_ppocr_status LW_PPOCR_CALL lw_ppocr_get_capabilities(
     lw_ppocr_handle handle,
     lw_ppocr_capabilities* capabilities) {
     if (handle == nullptr || capabilities == nullptr ||
-        capabilities->struct_size < sizeof(lw_ppocr_capabilities)) {
+        capabilities->struct_size < LW_PPOCR_CAPABILITIES_V1_SIZE) {
         SetLastError("engine or capabilities structure is invalid");
         return LW_PPOCR_STATUS_INVALID_ARGUMENT;
     }

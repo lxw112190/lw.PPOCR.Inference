@@ -73,11 +73,12 @@
 | .NET | OS | 架构 | 验证版本 | 状态 |
 |---|---|---|---|---|
 | .NET 8.0 | Windows 10 22H2 | x64 | v0.2.0 | ✅ |
+| .NET Framework 4.7.2 | Windows 10/11 | x64 | v1.1.0 | ✅ (WinForms Demo) |
 | .NET 8.0 | Windows 11 | x64 | — | Planned |
 | .NET 9.0 | Windows 10/11 | x64 | — | Planned |
 
 **已知限制:**
-- 当前仅 `net8.0-windows` TFM。其他 TFM 建议在 API v1 冻结后添加。
+- 绑定库支持 `net472` 与 `net8.0`；WinForms Demo 支持 `net472` 与 `net8.0-windows`，部署包默认携带 `net472` 版本。
 - `OcrEngine.Run()` 接受 `byte[]`，不直接支持 `Bitmap`（可通过适配层转换）。
 
 ---
@@ -90,6 +91,7 @@
 | C++ | 直接链接 + `extern "C"` 头文件 | v0.1.0 | ✅ |
 | C# | P/Invoke | v0.1.0 | ✅ |
 | Python | ctypes | v0.5.0 | ✅ (example) |
+| C / C# / Python | `recognize` / `recognize_batch` | v1.1.0 | ✅ |
 | Delphi | — | — | Planned |
 | Go | cgo / syscall | — | Planned |
 | Rust | `extern "C"` / `libloading` | — | Planned |

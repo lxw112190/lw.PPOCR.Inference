@@ -61,7 +61,24 @@ typedef struct lw_ppocr_runtime_api {
     uint32_t public_result_size;
     uint32_t public_capabilities_size;
     uint64_t public_abi_fingerprint;
+
+    /* v1.1 append-only extension. */
+    lw_ppocr_status(LW_PPOCR_CALL* recognize_batch)(
+        void* runtime_handle,
+        const lw_ppocr_image* cropped_images,
+        uint64_t image_count,
+        lw_ppocr_recognition_result** result);
+
+    void(LW_PPOCR_CALL* recognition_result_free)(
+        void* runtime_handle,
+        lw_ppocr_recognition_result* result);
+
+    uint32_t public_recognition_size;
+    uint32_t public_recognition_result_size;
 } lw_ppocr_runtime_api;
+
+#define LW_PPOCR_RUNTIME_API_V1_SIZE ((uint32_t)(offsetof(lw_ppocr_runtime_api, public_abi_fingerprint) + sizeof(uint64_t)))
+#define LW_PPOCR_RUNTIME_API_V1_1_SIZE ((uint32_t)(offsetof(lw_ppocr_runtime_api, public_recognition_result_size) + sizeof(uint32_t)))
 
 typedef lw_ppocr_status(LW_PPOCR_CALL* lw_ppocr_runtime_get_api_fn)(
     uint32_t requested_api_version,

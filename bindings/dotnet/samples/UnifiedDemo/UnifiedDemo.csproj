@@ -1,10 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFrameworks>net8.0-windows;net472</TargetFrameworks>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
     <AssemblyName>lw.PPOCR.Demo</AssemblyName>
     <RootNamespace>Lw.PPOCR.Demo</RootNamespace>
     <AssemblyTitle>lw.PPOCR.Inference 统一推理体验程序</AssemblyTitle>
@@ -12,10 +13,10 @@
     <Company>天天代码码天天</Company>
     <Authors>天天代码码天天</Authors>
     <Description>OpenCV DNN、DirectML、OpenVINO、TensorRT 统一 PP-OCR 推理体验程序</Description>
-    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <ApplicationDefaultFont>Microsoft YaHei UI, 9pt</ApplicationDefaultFont>
-    <Version>1.0.0</Version>
-    <FileVersion>1.0.0.0</FileVersion>
+    <ApplicationHighDpiMode Condition="'$(TargetFramework)' == 'net8.0-windows'">PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationDefaultFont Condition="'$(TargetFramework)' == 'net8.0-windows'">Microsoft YaHei UI, 9pt</ApplicationDefaultFont>
+    <Version>1.1.0</Version>
+    <FileVersion>1.1.0.0</FileVersion>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
   </PropertyGroup>
 

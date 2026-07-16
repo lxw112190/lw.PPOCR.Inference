@@ -130,6 +130,48 @@ namespace Lw.PPOCRSharp
         }
 
         [StructLayout(LayoutKind.Sequential)]
+        internal struct NativeRecognition
+        {
+            internal uint StructSize;
+            internal uint ApiVersion;
+            internal ulong SourceIndex;
+            internal IntPtr Text;
+            internal float Score;
+            internal int ClassifierLabel;
+            internal float ClassifierScore;
+            internal int ReservedI0;
+            internal int ReservedI1;
+            internal int ReservedI2;
+            internal int ReservedI3;
+            internal IntPtr ReservedP0;
+            internal IntPtr ReservedP1;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct NativeRecognitionResult
+        {
+            internal uint StructSize;
+            internal uint ApiVersion;
+            internal ulong ItemCount;
+            internal IntPtr Items;
+            internal NativeTiming Classifier;
+            internal NativeTiming Recognizer;
+            internal NativeTiming Pipeline;
+            internal int ReservedI0;
+            internal int ReservedI1;
+            internal int ReservedI2;
+            internal int ReservedI3;
+            internal int ReservedI4;
+            internal int ReservedI5;
+            internal int ReservedI6;
+            internal int ReservedI7;
+            internal IntPtr ReservedP0;
+            internal IntPtr ReservedP1;
+            internal IntPtr ReservedP2;
+            internal IntPtr ReservedP3;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
         internal struct NativeCapabilities
         {
             internal uint StructSize;
@@ -157,8 +199,18 @@ namespace Lw.PPOCRSharp
         [DllImport(DllName, EntryPoint = "lw_ppocr_run", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int Run(IntPtr handle, ref NativeImage image, out IntPtr result);
 
+        [DllImport(DllName, EntryPoint = "lw_ppocr_recognize_batch", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int RecognizeBatch(
+            IntPtr handle,
+            [In] NativeImage[] images,
+            ulong imageCount,
+            out IntPtr result);
+
         [DllImport(DllName, EntryPoint = "lw_ppocr_result_free", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void ResultFree(IntPtr handle, IntPtr result);
+
+        [DllImport(DllName, EntryPoint = "lw_ppocr_recognition_result_free", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void RecognitionResultFree(IntPtr handle, IntPtr result);
 
         [DllImport(DllName, EntryPoint = "lw_ppocr_get_capabilities", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int GetCapabilities(

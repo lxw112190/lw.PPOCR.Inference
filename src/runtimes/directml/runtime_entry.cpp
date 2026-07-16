@@ -1,6 +1,7 @@
 #include "directml_engine.hpp"
 
 #include <lw/ppocr/runtime_api.h>
+#include <lw/ppocr/runtime_result.hpp>
 
 #include <onnxruntime_cxx_api.h>
 #include <opencv2/core.hpp>
@@ -182,6 +183,28 @@ lw_ppocr_status LW_PPOCR_CALL RunJson(void* handle,
     }, "run DirectML JSON inference");
 }
 
+lw_ppocr_status LW_PPOCR_CALL RecognizeBatch(
+    void* handle, const lw_ppocr_image* images, uint64_t image_count,
+    lw_ppocr_recognition_result** result) {
+    if (!handle || !images || image_count == 0 || !result) {
+        g_last_error = "DirectML recognition received invalid arguments";
+        return LW_PPOCR_STATUS_INVALID_ARGUMENT;
+    }
+    *result = nullptr;
+    return Guard([&] {
+        auto owned = lw::ppocr::runtime::ToNativeRecognitionResult(
+            static_cast<DirectMlOcrEngine*>(handle)->RecognizeBatch(
+                images, image_count));
+        *result = &owned->value;
+        owned.release();
+    }, "run DirectML recognition-only inference");
+}
+
+void LW_PPOCR_CALL RecognitionResultFree(
+    void*, lw_ppocr_recognition_result* result) {
+    lw::ppocr::runtime::FreeRecognitionResult(result);
+}
+
 void LW_PPOCR_CALL ResultFree(void*, lw_ppocr_result* result) {
     if (result) {
         delete static_cast<OwnedResult*>(
@@ -194,7 +217,7 @@ void LW_PPOCR_CALL StringFree(void*, char* value) { std::free(value); }
 lw_ppocr_status LW_PPOCR_CALL GetCapabilities(
     void* handle, lw_ppocr_capabilities* capabilities) {
     if (!handle || !capabilities ||
-        capabilities->struct_size < sizeof(lw_ppocr_capabilities)) {
+        capabilities->struct_size < LW_PPOCR_CAPABILITIES_V1_SIZE) {
         g_last_error = "DirectML capabilities received invalid arguments";
         return LW_PPOCR_STATUS_INVALID_ARGUMENT;
     }
@@ -230,7 +253,10 @@ const lw_ppocr_runtime_api kRuntimeApi = {
     static_cast<uint32_t>(sizeof(lw_ppocr_image)),
     static_cast<uint32_t>(sizeof(lw_ppocr_result)),
     static_cast<uint32_t>(sizeof(lw_ppocr_capabilities)),
-    LW_PPOCR_ABI_FINGERPRINT
+    LW_PPOCR_ABI_FINGERPRINT,
+    &RecognizeBatch, &RecognitionResultFree,
+    static_cast<uint32_t>(sizeof(lw_ppocr_recognition)),
+    static_cast<uint32_t>(sizeof(lw_ppocr_recognition_result))
 };
 
 }  // namespace

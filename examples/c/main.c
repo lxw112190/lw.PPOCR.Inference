@@ -82,6 +82,30 @@ typedef struct lw_ppocr_result {
     const void*               reserved_ptr[4];
 } lw_ppocr_result;
 
+typedef struct lw_ppocr_recognition {
+    uint32_t struct_size;
+    uint32_t api_version;
+    uint64_t source_index;
+    const char* text_utf8;
+    float score;
+    int32_t cls_label;
+    float cls_score;
+    int32_t reserved_i32[4];
+    const void* reserved_ptr[2];
+} lw_ppocr_recognition;
+
+typedef struct lw_ppocr_recognition_result {
+    uint32_t struct_size;
+    uint32_t api_version;
+    uint64_t item_count;
+    const lw_ppocr_recognition* items;
+    lw_ppocr_timing classifier;
+    lw_ppocr_timing recognizer;
+    lw_ppocr_timing pipeline;
+    int32_t reserved_i32[8];
+    const void* reserved_ptr[4];
+} lw_ppocr_recognition_result;
+
 typedef struct lw_ppocr_image {
     uint32_t              struct_size;
     uint32_t              api_version;
@@ -129,6 +153,11 @@ typedef lw_ppocr_status (__cdecl *lw_ppocr_run_fn)(
     lw_ppocr_result** result);
 typedef void (__cdecl *lw_ppocr_result_free_fn)(
     lw_ppocr_handle handle, lw_ppocr_result* result);
+typedef lw_ppocr_status (__cdecl *lw_ppocr_recognize_batch_fn)(
+    lw_ppocr_handle handle, const lw_ppocr_image* images,
+    uint64_t image_count, lw_ppocr_recognition_result** result);
+typedef void (__cdecl *lw_ppocr_recognition_result_free_fn)(
+    lw_ppocr_handle handle, lw_ppocr_recognition_result* result);
 typedef void (__cdecl *lw_ppocr_destroy_fn)(lw_ppocr_handle* handle);
 typedef lw_ppocr_status (__cdecl *lw_ppocr_get_capabilities_fn)(
     lw_ppocr_handle handle, void* capabilities);
@@ -176,6 +205,11 @@ int main(int argc, char** argv) {
     lw_ppocr_create_fn          create_fn  = (lw_ppocr_create_fn)load_fn("lw_ppocr_create");
     lw_ppocr_run_fn             run_fn     = (lw_ppocr_run_fn)load_fn("lw_ppocr_run");
     lw_ppocr_result_free_fn     free_fn    = (lw_ppocr_result_free_fn)load_fn("lw_ppocr_result_free");
+    lw_ppocr_recognize_batch_fn recognize_fn =
+        (lw_ppocr_recognize_batch_fn)load_fn("lw_ppocr_recognize_batch");
+    lw_ppocr_recognition_result_free_fn recognition_free_fn =
+        (lw_ppocr_recognition_result_free_fn)load_fn(
+            "lw_ppocr_recognition_result_free");
     lw_ppocr_destroy_fn         destroy_fn = (lw_ppocr_destroy_fn)load_fn("lw_ppocr_destroy");
     lw_ppocr_get_last_error_fn  error_fn   = (lw_ppocr_get_last_error_fn)load_fn("lw_ppocr_get_last_error");
 
@@ -243,8 +277,32 @@ int main(int argc, char** argv) {
     printf("recognizer: %.2f ms\n", result->recognizer.total_ms);
     printf("pipeline:  %.2f ms\n", result->pipeline.total_ms);
 
-    /* 6. cleanup */
+    /* 6. recognition-only: image is already a cropped text-line image */
     free_fn(engine, result);
+    {
+        lw_ppocr_image crops[2] = {image, image};
+        lw_ppocr_recognition_result* recognition = NULL;
+        status = recognize_fn(engine, crops, 2, &recognition);
+        if (status != LW_PPOCR_STATUS_OK || recognition == NULL) {
+            fprintf(stderr, "error: recognition-only failed (status=%d)\n", status);
+            print_last_error(error_fn, engine);
+            destroy_fn(&engine);
+            FreeLibrary(g_dll);
+            return 1;
+        }
+        for (uint64_t i = 0; i < recognition->item_count; i++) {
+            printf("crop[%llu]: \"%s\" score=%.4f\n",
+                (unsigned long long)recognition->items[i].source_index,
+                recognition->items[i].text_utf8 != NULL
+                    ? recognition->items[i].text_utf8 : "",
+                recognition->items[i].score);
+        }
+        printf("recognition-only: %.2f ms\n",
+            recognition->pipeline.total_ms);
+        recognition_free_fn(engine, recognition);
+    }
+
+    /* 7. cleanup */
     destroy_fn(&engine);
     if (engine != NULL) {
         fprintf(stderr, "error: destroy did not clear handle\n");

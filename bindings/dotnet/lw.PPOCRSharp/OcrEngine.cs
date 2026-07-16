@@ -138,6 +138,86 @@ namespace Lw.PPOCRSharp
             }
         }
 
+        public OcrRecognitionResult Recognize(
+            byte[] pixels, int width, int height, int stride,
+            OcrPixelFormat pixelFormat = OcrPixelFormat.Bgr24)
+        {
+            return RecognizeBatch(new[] {
+                new OcrImage(pixels, width, height, stride, pixelFormat)
+            });
+        }
+
+        public OcrRecognitionResult RecognizeBatch(
+            IReadOnlyList<OcrImage> images)
+        {
+            if (images == null)
+            {
+                throw new ArgumentNullException(nameof(images));
+            }
+            if (images.Count == 0)
+            {
+                throw new ArgumentException("At least one cropped image is required.",
+                    nameof(images));
+            }
+
+            OcrSafeHandle localHandle = GetHandle();
+            bool handleAdded = false;
+            var pins = new GCHandle[images.Count];
+            var nativeImages = new NativeMethods.NativeImage[images.Count];
+            try
+            {
+                localHandle.DangerousAddRef(ref handleAdded);
+                for (int index = 0; index < images.Count; index++)
+                {
+                    OcrImage image = images[index] ??
+                        throw new ArgumentException("The image list contains null.", nameof(images));
+                    pins[index] = GCHandle.Alloc(image.Pixels, GCHandleType.Pinned);
+                    nativeImages[index] = new NativeMethods.NativeImage
+                    {
+                        StructSize = (uint)Marshal.SizeOf<NativeMethods.NativeImage>(),
+                        ApiVersion = NativeMethods.ApiVersion,
+                        Data = pins[index].AddrOfPinnedObject(),
+                        DataSize = (ulong)image.Pixels.LongLength,
+                        Width = image.Width,
+                        Height = image.Height,
+                        Stride = image.Stride,
+                        PixelFormat = (int)image.PixelFormat
+                    };
+                }
+
+                IntPtr nativeHandle = localHandle.DangerousGetHandle();
+                IntPtr nativeResult;
+                int status = NativeMethods.RecognizeBatch(nativeHandle,
+                    nativeImages, (ulong)nativeImages.Length, out nativeResult);
+                if (status != NativeMethods.StatusOk)
+                {
+                    throw CreateException(status, nativeHandle);
+                }
+                try
+                {
+                    return CopyRecognitionResult(nativeResult);
+                }
+                finally
+                {
+                    NativeMethods.RecognitionResultFree(nativeHandle, nativeResult);
+                }
+            }
+            finally
+            {
+                for (int index = 0; index < pins.Length; index++)
+                {
+                    if (pins[index].IsAllocated)
+                    {
+                        pins[index].Free();
+                    }
+                }
+                if (handleAdded)
+                {
+                    localHandle.DangerousRelease();
+                }
+            }
+        }
+
         public void Dispose()
         {
             if (handle != null)
@@ -188,6 +268,35 @@ namespace Lw.PPOCRSharp
                 ToTiming(native.Classifier),
                 ToTiming(native.Recognizer),
                 ToTiming(native.Pipeline));
+        }
+
+        private static OcrRecognitionResult CopyRecognitionResult(IntPtr pointer)
+        {
+            if (pointer == IntPtr.Zero)
+            {
+                throw new InvalidOperationException(
+                    "The native Runtime returned a null recognition result.");
+            }
+            NativeMethods.NativeRecognitionResult native =
+                Marshal.PtrToStructure<NativeMethods.NativeRecognitionResult>(pointer);
+            if (native.ItemCount > int.MaxValue)
+            {
+                throw new InvalidOperationException(
+                    "The native Runtime returned too many recognition items.");
+            }
+            var items = new List<OcrRecognition>((int)native.ItemCount);
+            int itemSize = Marshal.SizeOf<NativeMethods.NativeRecognition>();
+            for (int index = 0; index < (int)native.ItemCount; index++)
+            {
+                IntPtr itemPointer = IntPtr.Add(native.Items, checked(index * itemSize));
+                NativeMethods.NativeRecognition item =
+                    Marshal.PtrToStructure<NativeMethods.NativeRecognition>(itemPointer);
+                items.Add(new OcrRecognition(
+                    checked((long)item.SourceIndex), Utf8FromPointer(item.Text),
+                    item.Score, item.ClassifierLabel, item.ClassifierScore));
+            }
+            return new OcrRecognitionResult(items, ToTiming(native.Classifier),
+                ToTiming(native.Recognizer), ToTiming(native.Pipeline));
         }
 
         private static OcrCapabilities ReadCapabilities(IntPtr nativeHandle)

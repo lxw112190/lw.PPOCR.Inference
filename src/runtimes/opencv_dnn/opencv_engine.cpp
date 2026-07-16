@@ -453,6 +453,26 @@ core::PipelineResult OpenCvOcrEngine::Run(const lw_ppocr_image& image) {
     return result;
 }
 
+core::RecognitionResult OpenCvOcrEngine::RecognizeBatch(
+    const lw_ppocr_image* images, uint64_t image_count) {
+    std::lock_guard<std::mutex> lock(impl_->run_mutex);
+    const Clock::time_point pipeline_start = Clock::now();
+    std::vector<cv::Mat> crops;
+    crops.reserve(static_cast<size_t>(image_count));
+    for (uint64_t index = 0; index < image_count; ++index) {
+        crops.push_back(core::ToBgr(images[index]).clone());
+    }
+
+    core::RecognitionResult result;
+    result.items.resize(crops.size());
+    if (impl_->classifier != nullptr) {
+        impl_->classifier->Run(crops, result.items, result.classifier);
+    }
+    impl_->recognizer.Run(crops, result.items, result.recognizer);
+    result.pipeline.total_ms = Milliseconds(pipeline_start, Clock::now());
+    return result;
+}
+
 void OpenCvOcrEngine::Log(
     lw_ppocr_log_level level,
     const std::string& message) const noexcept {

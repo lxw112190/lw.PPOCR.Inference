@@ -35,6 +35,14 @@
 - [x] 向后兼容承诺：struct 只追加、enum 只追加、函数不删
 - [x] Schema v1 永久固定
 
+## v1.1.0 (已完成) — 只识别接口与本地服务体验
+
+- [x] C ABI 追加单张/批量只识别接口，保持 API v1 向后兼容
+- [x] OpenCV DNN、DirectML、OpenVINO、TensorRT 四后端实现只识别
+- [x] C、Python、.NET 绑定与示例覆盖新接口
+- [x] WinForms Demo 支持鼠标框选文字区域并立即识别
+- [x] HTTP API、测试网页、Windows 服务安装脚本进入部署包
+
 ---
 
 ## Completed

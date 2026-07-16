@@ -64,5 +64,26 @@ internal sealed class ImageFrame : IDisposable
         }
     }
 
+    internal OcrImage Crop(Rectangle region)
+    {
+        Rectangle clipped = Rectangle.Intersect(
+            new Rectangle(0, 0, Width, Height), region);
+        if (clipped.Width <= 0 || clipped.Height <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(region),
+                "框选区域不在图片范围内。");
+        }
+        int cropStride = checked(clipped.Width * 3);
+        byte[] crop = new byte[checked(cropStride * clipped.Height)];
+        for (int row = 0; row < clipped.Height; row++)
+        {
+            Buffer.BlockCopy(Pixels,
+                checked((clipped.Top + row) * Stride + clipped.Left * 3),
+                crop, row * cropStride, cropStride);
+        }
+        return new OcrImage(crop, clipped.Width, clipped.Height,
+            cropStride, OcrPixelFormat.Bgr24);
+    }
+
     public void Dispose() => Bitmap.Dispose();
 }

@@ -29,3 +29,8 @@ dotnet run --project samples/UnifiedCli -- `
 supports backend and GPU selection, manifest browsing, classifier and batch
 settings, drag-and-drop images, explicit engine initialization/destruction,
 OCR box overlays, structured results, text copying, and stage timings.
+The image view also supports mouse-drag region selection: releasing the mouse
+crops that area and calls the recognition-only API without running detection.
+
+For customers that already have cropped text-line images, call `Recognize` or
+`RecognizeBatch`. Batch results preserve input order through `SourceIndex`.

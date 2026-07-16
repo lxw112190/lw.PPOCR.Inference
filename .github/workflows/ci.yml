@@ -13,6 +13,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  schema-validation:
+    name: Model manifest Schema v1
+    runs-on: windows-2022
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install JSON Schema validator
+        run: python -m pip install jsonschema==4.25.1
+
+      - name: Validate shipped manifests
+        run: python scripts/validate-model-schema.py
+
   # ------------------------------------------------------------------
   # VS preset build + ABI smoke + ABI stability
   # ------------------------------------------------------------------
@@ -39,6 +56,39 @@ jobs:
 
       - name: ABI stability test
         run: ctest --preset vs2022-x64-release -R lw.ppocr.abi.stability --output-on-failure
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Python ctypes smoke test
+        shell: pwsh
+        run: |
+          @'
+          import sys
+          from pathlib import Path
+
+          root = Path.cwd()
+          sys.path.insert(0, str(root / "examples" / "python"))
+          from ppocr import OcrEngine
+
+          binary_dir = root / "build" / "vs2022-x64" / "bin" / "Release"
+          with OcrEngine(
+              backend="opencv",
+              model_manifest="stub://python-smoke",
+              runtime_library=str(binary_dir / "lw.PPOCR.Runtime.Stub.dll"),
+              dll_path=str(binary_dir / "lw.PPOCR.dll"),
+              enable_cls=False,
+          ) as engine:
+              result = engine.run(bytes(12), width=2, height=2, stride=6)
+              assert not result.regions
+          print("Python ctypes smoke passed")
+          '@ | python -
+
+      - name: HTTP service smoke test
+        run: >-
+          python scripts/http-service-smoke.py
+          --binary-dir build/vs2022-x64/bin/Release
 
   # ------------------------------------------------------------------
   # OpenCV DNN integration + golden correctness test

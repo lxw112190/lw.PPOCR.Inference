@@ -11,22 +11,16 @@ internal sealed partial class MainForm : Form
     private bool configDirty = true;
     private bool busy;
 
-    internal MainForm()
+    internal MainForm(string? preferredBackend = null)
     {
         InitializeComponent();
         BindEvents();
-        LoadDefaults();
+        LoadDefaults(preferredBackend);
     }
 
     internal async Task RunExperienceSmokeAsync(string backend)
     {
-        backendBox.SelectedIndex = backend.ToLowerInvariant() switch
-        {
-            "directml" or "dml" or "directml-cpu" or "dml-cpu" => 1,
-            "openvino" => 2,
-            "tensorrt" or "trt" => 3,
-            _ => 0
-        };
+        SelectBackend(backend);
         if (backend.Equals("directml-cpu", StringComparison.OrdinalIgnoreCase) ||
             backend.Equals("dml-cpu", StringComparison.OrdinalIgnoreCase))
         {
@@ -47,6 +41,8 @@ internal sealed partial class MainForm : Form
         runtimeBrowseButton.Click += (_, _) => BrowseRuntimeRoot();
         openImageButton.Click += (_, _) => BrowseImage();
         recognizeButton.Click += async (_, _) => await RecognizeAsync();
+        imageView.RegionSelected += async (_, args) =>
+            await RecognizeSelectedRegionAsync(args.Region);
         copyButton.Click += (_, _) => CopyText();
         backendBox.SelectedIndexChanged += (_, _) => ApplyBackendDefaults();
         manifestText.TextChanged += (_, _) => MarkConfigurationChanged();
@@ -78,7 +74,7 @@ internal sealed partial class MainForm : Form
         };
     }
 
-    private void LoadDefaults()
+    private void LoadDefaults(string? preferredBackend)
     {
         backendBox.Items.AddRange(new object[]
         {
@@ -89,7 +85,7 @@ internal sealed partial class MainForm : Form
         });
         runtimeRootText.Text = Path.Combine("runtimes", "win-x64");
         manifestText.Text = Path.Combine("models", "ppocrv6-tiny", "model.json");
-        backendBox.SelectedIndex = 0;
+        SelectBackend(preferredBackend);
         destroyButton.Enabled = false;
         copyButton.Enabled = false;
         string sampleImage = ResolveAppPath(
@@ -103,6 +99,17 @@ internal sealed partial class MainForm : Form
         {
             statusLabel.Text = "请选择模型清单和图片，然后初始化引擎";
         }
+    }
+
+    private void SelectBackend(string? backend)
+    {
+        backendBox.SelectedIndex = backend?.ToLowerInvariant() switch
+        {
+            "directml" or "dml" or "directml-cpu" or "dml-cpu" => 1,
+            "openvino" => 2,
+            "tensorrt" or "trt" => 3,
+            _ => 0
+        };
     }
 
     private async Task<bool> InitializeEngineAsync()
@@ -212,6 +219,68 @@ internal sealed partial class MainForm : Form
         }
     }
 
+    private async Task RecognizeSelectedRegionAsync(Rectangle region)
+    {
+        if (busy || imageFrame is null)
+        {
+            return;
+        }
+        if (engine is null || configDirty)
+        {
+            if (!await InitializeEngineAsync())
+            {
+                return;
+            }
+        }
+
+        ImageFrame activeImage = imageFrame;
+        OcrEngine activeEngine = engine!;
+        OcrImage crop;
+        try
+        {
+            crop = activeImage.Crop(region);
+        }
+        catch (Exception exception)
+        {
+            ShowError(exception.Message, "框选区域无效");
+            return;
+        }
+
+        SetBusy(true, $"正在识别框选区域 {region.Width} x {region.Height}...");
+        try
+        {
+            OcrRecognitionResult result = await Task.Run(() =>
+                activeEngine.Recognize(crop.Pixels, crop.Width, crop.Height,
+                    crop.Stride, crop.PixelFormat));
+            currentResult = null;
+            resultGrid.Rows.Clear();
+            var text = new StringBuilder();
+            for (int index = 0; index < result.Items.Count; index++)
+            {
+                OcrRecognition item = result.Items[index];
+                resultGrid.Rows.Add(index + 1, item.Text, item.Score.ToString("P1"));
+                text.AppendLine(item.Text);
+            }
+            plainText.Text = text.ToString();
+            copyButton.Enabled = result.Items.Count > 0;
+            timingLabel.Text =
+                $"框选识别 | CLS {result.Classifier.TotalMilliseconds:F1} ms  |  " +
+                $"REC {result.Recognizer.TotalMilliseconds:F1} ms  |  " +
+                $"总计 {result.Pipeline.TotalMilliseconds:F1} ms";
+            statusLabel.Text = result.Items.Count == 0
+                ? "框选区域未识别到文字"
+                : $"框选识别完成：{result.Items[0].Text}";
+        }
+        catch (Exception exception)
+        {
+            ShowError(exception.Message, "框选识别失败");
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
     private OcrOptions CreateOptions()
     {
         if (backendBox.SelectedItem is not BackendItem selected)
@@ -286,7 +355,6 @@ internal sealed partial class MainForm : Form
         using var dialog = new FolderBrowserDialog
         {
             Description = "选择包含 opencv、directml、openvino、tensorrt 的 Runtime 根目录",
-            UseDescriptionForTitle = true,
             SelectedPath = Directory.Exists(ResolveAppPath(runtimeRootText.Text))
                 ? ResolveAppPath(runtimeRootText.Text)
                 : AppContext.BaseDirectory
@@ -423,6 +491,7 @@ internal sealed partial class MainForm : Form
         manifestText.Enabled = !value;
         runtimeRootText.Enabled = !value;
         UseWaitCursor = value;
+        imageView.SelectionEnabled = !value;
         if (!string.IsNullOrEmpty(message))
         {
             statusLabel.Text = message;
@@ -498,13 +567,35 @@ internal sealed partial class MainForm : Form
 
     private static string ToAppRelativePath(string path)
     {
+#if NETFRAMEWORK
+        string baseDirectory = Path.GetFullPath(AppContext.BaseDirectory);
+        if (!baseDirectory.EndsWith(Path.DirectorySeparatorChar.ToString(),
+            StringComparison.Ordinal))
+        {
+            baseDirectory += Path.DirectorySeparatorChar;
+        }
+        var baseUri = new Uri(baseDirectory);
+        var pathUri = new Uri(Path.GetFullPath(path));
+        return Uri.UnescapeDataString(baseUri.MakeRelativeUri(pathUri).ToString())
+            .Replace('/', Path.DirectorySeparatorChar);
+#else
         return Path.GetRelativePath(
             AppContext.BaseDirectory,
             Path.GetFullPath(path));
+#endif
     }
 
-    private sealed record BackendItem(string Name, OcrBackend Backend)
+    private sealed class BackendItem
     {
+        internal BackendItem(string name, OcrBackend backend)
+        {
+            Name = name;
+            Backend = backend;
+        }
+
+        internal string Name { get; }
+        internal OcrBackend Backend { get; }
+
         public override string ToString() => Name;
     }
 }

@@ -14,6 +14,11 @@
     "stages"
   ],
   "properties": {
+    "$schema": {
+      "description": "Optional URI reference to the JSON Schema used to validate this manifest.",
+      "type": "string",
+      "minLength": 1
+    },
     "schema_version": {
       "description": "Manifest schema version. Currently only version 1 is defined.",
       "const": 1

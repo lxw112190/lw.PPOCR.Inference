@@ -304,6 +304,24 @@ int main(int argc, char** argv) {
         const uint64_t expected_region_count = result->region_count;
         lw_ppocr_result_free(engine, result);
 
+        lw_ppocr_image crops[2] = {image, image};
+        lw_ppocr_recognition_result* recognition = nullptr;
+        const lw_ppocr_status recognition_status = lw_ppocr_recognize_batch(
+            engine, crops, 2, &recognition);
+        if (recognition_status != LW_PPOCR_STATUS_OK || recognition == nullptr ||
+            recognition->item_count != 2 || recognition->items == nullptr ||
+            recognition->items[0].source_index != 0 ||
+            recognition->items[1].source_index != 1) {
+            const std::string error = LastError(engine);
+            lw_ppocr_recognition_result_free(engine, recognition);
+            lw_ppocr_destroy(&engine);
+            std::filesystem::remove(manifest);
+            return Fail("recognition-only batch failed: " + error);
+        }
+        PrintTiming("recognition-only rec", recognition->recognizer);
+        PrintTiming("recognition-only pipeline", recognition->pipeline);
+        lw_ppocr_recognition_result_free(engine, recognition);
+
         const int stress_iterations =
             EnvironmentInteger("LW_PPOCR_STRESS_ITERATIONS", 0);
         const int stress_threads =

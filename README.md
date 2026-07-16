@@ -4,6 +4,8 @@
 
 `lw.PPOCR.Inference` 是一个面向 Windows 的统一 PP-OCR 推理项目。项目通过稳定的 C ABI 对外提供一致接口，并将 OpenCV DNN、ONNX Runtime DirectML、OpenVINO、TensorRT 四种推理后端隔离为独立 Runtime。
 
+当前稳定版本为 **v1.1.0**。API v1 与 ABI 已冻结；v1.1.0 以追加方式提供只识别接口、HTTP 服务和交互式 Demo，不破坏 v1.0.0 调用方。详见 [v1.1.0 Release Notes](docs/releases/v1.1.0.md)。
+
 上层程序只需要切换后端配置，不需要为不同推理框架重写 OCR 调用逻辑。除 C# 外，任何支持调用 C DLL 的语言都可以接入，例如 C、C++、Python、Java、Delphi、Go、Rust 等。
 
 ## 项目特点
@@ -12,9 +14,11 @@
 - C ABI 不暴露 STL、`cv::Mat`、C++ 类和异常
 - Runtime 及依赖库按后端隔离，避免 DLL 冲突
 - 支持文本检测、方向分类、文字识别完整流程
+- 支持单张和批量“只识别”，客户可直接传入已经裁剪好的文字区域
 - 支持结构化结果、JSON 结果、文字框、置信度和分阶段耗时
 - 支持 BGR、RGB、BGRA、RGBA、灰度图等常见像素格式
 - 提供 .NET 封装、命令行程序和 WinForms 体验程序
+- 提供 JSON + Base64 HTTP API、测试网页和 Windows Service 部署模式
 - 模型由 `model.json` 统一描述，应用程序无需硬编码模型文件名
 - 每个引擎实例独立管理配置、线程和内存，可显式初始化与销毁
 
@@ -25,9 +29,7 @@
 - 结构化结果和 JSON 字符串必须使用创建它们的同一实例释放。
 - `Destroy` 不能与推理并发执行；销毁前必须等待所有调用结束并释放全部结果。
 
-`v0.2.0` 增加了生命周期、长循环、并发和多实例稳定性测试；`v0.3.0` 冻结了模型清单 Schema v1 并增加了 golden 正确性测试集。
-多实例并行，以及四个真实后端的模型压力测试。测试方法和资源增长阈值见
-[稳定性测试说明](docs/stability-testing.md)。
+`v0.2.0` 增加了生命周期、长循环、并发和多实例稳定性测试；`v0.3.0` 冻结了模型清单 Schema v1 并增加了 golden 正确性测试集；`v1.0.0` 正式冻结 API v1 与 ABI。四个真实后端均完成模型压力测试，测试方法和资源增长阈值见 [稳定性测试说明](docs/stability-testing.md)。
 
 ## 四种推理后端
 
@@ -63,10 +65,11 @@ runtimes/win-x64/tensorrt/
 
 ## 快速体验
 
-发布包中提供两个程序：
+发布包中提供三个程序：
 
-- `lw.PPOCR.Demo.exe`：WinForms 图形界面体验程序
-- `lw.PPOCR.Cli.exe`：统一命令行测试程序
+- `lw.PPOCR.Demo.exe`：基于 .NET Framework 4.7.2 的 WinForms 图形界面体验程序
+- `lw.PPOCR.Cli.exe`：基于 .NET 8 的统一命令行测试程序
+- `lw.PPOCR.HttpService.exe`：原生 HTTP API 与 Windows Service
 
 启动 `lw.PPOCR.Demo.exe` 后：
 
@@ -76,8 +79,11 @@ runtimes/win-x64/tensorrt/
 4. 根据需要勾选“方向分类 CLS”。
 5. 点击“初始化”，选择图片后点击“开始识别”。
 6. 切换“明细”或“纯文本”查看结果，也可以直接复制文本。
+7. 在图片上按住鼠标左键拖拽框选文字区域，松开后会跳过检测并直接识别该区域。
 
 界面中的模型和 Runtime 相对路径均以 EXE 所在目录为基准，不受程序启动工作目录影响。`MainForm` 使用标准 WinForms Designer 文件组织，可直接在 Visual Studio 中编辑界面。
+
+按后端拆分的包会预选对应后端并附带体验模型。双击 `run-http-service.cmd` 可启动本机 HTTP API 和测试网页；`install-service.cmd` 可通过管理员权限安装为自动启动的 Windows 服务。API 说明见 [HTTP API 与 Windows Service](docs/http-service.md)。
 
 ## 命令行示例
 
@@ -308,6 +314,24 @@ dist/lw.PPOCR.Inference-win-x64/
 .\scripts\package-win-x64.ps1 -Split
 ```
 
+每个后端拆分包均包含轻量 .NET Framework 4.7.2 WinForms Demo、体验模型、原生 HTTP 服务、测试网页以及 Windows Service 安装/卸载脚本。
+
+生成正式的统一包 ZIP 与 SHA-256：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\package-win-x64.ps1 -Archive
+```
+
+生成 core 与四个后端拆分包的版本化 ZIP 和 SHA-256：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\package-win-x64.ps1 -Split -Archive
+```
+
+正式附件输出到 `dist/releases/v1.1.0/`。
+
 仅打包指定后端：
 
 ```powershell
@@ -322,8 +346,12 @@ dist/lw.PPOCR.Inference-win-x64/
 lw_ppocr_create
     -> lw_ppocr_run / lw_ppocr_run_json
         -> lw_ppocr_result_free / lw_ppocr_string_free
+    -> lw_ppocr_recognize / lw_ppocr_recognize_batch
+        -> lw_ppocr_recognition_result_free
     -> lw_ppocr_destroy
 ```
+
+`lw_ppocr_recognize_batch` 面向已经裁剪好的文字行，结果通过 `source_index` 保持与输入数组的对应关系。该调用不会执行 detector；是否执行方向分类由 `enable_cls` 决定。API v1 保持不变，新符号属于 v1.1.0 的追加式兼容扩展。
 
 所有由 DLL 返回的内存都必须使用对应的释放函数处理。不要跨模块直接 `delete` 或 `free`。
 
@@ -356,10 +384,15 @@ scripts/                 打包脚本
 
 `third_party/clipper` 中的 Clipper 6.4.2 由 Angus Johnson 开发，采用 Boost Software License 1.0。许可证原文位于源码目录 `third_party/clipper/LICENSE.txt`，发布包中位于 `licenses/clipper-BSL-1.0.txt`。第三方组件仍遵循各自的许可证和分发条款。
 
+Windows 发布包还会在 `licenses/` 中随附 OpenCV、ONNX Runtime、DirectML、
+OpenVINO、TensorRT、CUDA、cpp-httplib、nlohmann/json 和 PP-OCR 模型的许可证或第三方声明。TensorRT 与
+CUDA 组件属于 NVIDIA Corporation，使用和再分发须遵守包内所指向或随附的
+NVIDIA 协议；不接受相关条款时，请使用不含 NVIDIA 组件的拆分包。
+
 ## 当前状态
 
 四种 Runtime 已完成真实模型端到端测试，统一 Loader、C ABI、.NET 封装、CLI、WinForms Demo 和 Windows 发布流程已经跑通。
 
 本机四后端的硬件环境、SDK 版本、测试参数和多轮统计结果见 [性能测试报告](docs/performance-report.md)。
 
-当前版本仍处于 `0.x` 阶段。在 API v1 正式冻结前，公共接口仍可能调整；冻结后将优先通过结构体大小和新增字段保持向后兼容。
+当前稳定版本为 **v1.1.0**。`LW_PPOCR_API_VERSION` 保持为 `1`，v1.0.0 ABI 冻结承诺继续有效。后续 v1.x 只通过新增函数、结构体尾部追加字段和 `struct_size` 协商进行兼容扩展。

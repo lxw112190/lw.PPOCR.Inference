@@ -12,8 +12,10 @@ All types, enums, functions, and macros documented in
 as of v1.0.0.  Specifically:
 
 - `LW_PPOCR_API_VERSION` = 1 (permanent)
-- `LW_PPOCR_ABI_FINGERPRINT` = `0x4C5750504F435201` (stable base; increments on
-  compatible additions only — new fields, new enumerators)
+- `LW_PPOCR_ABI_FINGERPRINT_V1` = `0x4C5750504F435201` (stable base;
+  the low byte increments on compatible additions only)
+- `LW_PPOCR_*_V1_SIZE` macros define the frozen minimum prefix size accepted
+  by v1 Loaders and Runtimes
 - All `lw_ppocr_*` structs: fields may be **appended** after `reserved_*`
   padding; existing fields are never removed, renamed, or retyped
 - All `lw_ppocr_*` enums: values may be **appended**; existing values persist
@@ -50,16 +52,18 @@ typedef struct lw_ppocr_config {
 // After (v1.1.0):
 typedef struct lw_ppocr_config {
     // ... existing fields (unchanged) ...
-    int32_t new_field;          // ← appended
-    int32_t reserved_i32[7];    // ← reduced from [8]
+    int32_t reserved_i32[8];
     const void* reserved_ptr[4];
+    int32_t new_field;          // ← appended after the frozen v1 prefix
 } lw_ppocr_config;
 ```
 
 Callers compiled against v1.0.0 headers set `struct_size = sizeof(v1.0.0 struct)`.
-The Runtime checks `struct_size >= sizeof(v1.1.0 struct)` and reads `new_field`
-only when the caller's struct is large enough.  This is the standard
-Windows `cbSize` pattern.
+The Runtime checks `struct_size >= LW_PPOCR_CONFIG_V1_SIZE`, reads `new_field`
+only when `struct_size` reaches the end of that field, and otherwise uses the
+documented legacy default. This is the standard Windows `cbSize` pattern.
+Callers must zero-initialize structures so reserved storage remains available
+for compatible evolution.
 
 ### Adding a new enum value
 
@@ -81,6 +85,15 @@ unchanged.  New callers can pass 5.
 New functions are added with new names (e.g., `lw_ppocr_run_async`).  Existing
 functions are never removed or changed.  Callers link against the same DLL and
 use `GetProcAddress` for optional functions.
+
+### v1.1.0 compatible extension
+
+v1.1.0 is the first application of these rules. It adds
+`lw_ppocr_recognize`, `lw_ppocr_recognize_batch`, recognition result types,
+and two Runtime function-table entries at the tail. `LW_PPOCR_API_VERSION`
+remains 1. A v1.1 Loader accepts a v1.0 Runtime for the original OCR calls and
+returns `LW_PPOCR_STATUS_UNSUPPORTED` when recognition-only inference is not
+present. A v1.0 Loader continues to use the frozen v1 prefix of a v1.1 Runtime.
 
 ## What is NOT frozen
 
@@ -114,7 +127,7 @@ if (v.api_version < 1) { /* unsupported */ }
 ```
 
 **Q: Does a new ABI fingerprint mean a breaking change?**
-No.  The fingerprint increments on compatible additions (new fields, new
-enumerators) to serve as a minimum-version gate.  An old fingerprint always
-works with a newer Runtime — the Runtime knows the full history of the
-fingerprint.
+No. The low byte increments on compatible additions (new fields, new
+enumerators). The Loader accepts fingerprints in the frozen
+`LW_PPOCR_ABI_FINGERPRINT_FAMILY` and validates the v1 minimum prefix sizes,
+so a newer append-only Runtime remains usable through the v1 Loader contract.

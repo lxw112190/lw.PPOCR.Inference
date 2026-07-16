@@ -143,6 +143,72 @@ namespace Lw.PPOCRSharp
         public OcrTiming Pipeline { get; }
     }
 
+    public sealed class OcrImage
+    {
+        public OcrImage(byte[] pixels, int width, int height, int stride,
+            OcrPixelFormat pixelFormat = OcrPixelFormat.Bgr24)
+        {
+            Pixels = pixels ?? throw new ArgumentNullException(nameof(pixels));
+            if (width <= 0 || height <= 0 || stride <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(width),
+                    "Image dimensions and stride must be positive.");
+            }
+            if ((long)stride * height > pixels.LongLength)
+            {
+                throw new ArgumentException(
+                    "The image buffer is smaller than stride times height.",
+                    nameof(pixels));
+            }
+            Width = width;
+            Height = height;
+            Stride = stride;
+            PixelFormat = pixelFormat;
+        }
+
+        public byte[] Pixels { get; }
+        public int Width { get; }
+        public int Height { get; }
+        public int Stride { get; }
+        public OcrPixelFormat PixelFormat { get; }
+    }
+
+    public sealed class OcrRecognition
+    {
+        internal OcrRecognition(long sourceIndex, string text, float score,
+            int classifierLabel, float classifierScore)
+        {
+            SourceIndex = sourceIndex;
+            Text = text;
+            Score = score;
+            ClassifierLabel = classifierLabel;
+            ClassifierScore = classifierScore;
+        }
+
+        public long SourceIndex { get; }
+        public string Text { get; }
+        public float Score { get; }
+        public int ClassifierLabel { get; }
+        public float ClassifierScore { get; }
+    }
+
+    public sealed class OcrRecognitionResult
+    {
+        internal OcrRecognitionResult(IReadOnlyList<OcrRecognition> items,
+            OcrTiming classifier, OcrTiming recognizer, OcrTiming pipeline)
+        {
+            Items = items;
+            Classifier = classifier;
+            Recognizer = recognizer;
+            Pipeline = pipeline;
+        }
+
+        public IReadOnlyList<OcrRecognition> Items { get; }
+        public OcrTiming Classifier { get; }
+        public OcrTiming Recognizer { get; }
+        public OcrTiming Pipeline { get; }
+    }
+
     public sealed class OcrException : Exception
     {
         internal OcrException(int status, string message)

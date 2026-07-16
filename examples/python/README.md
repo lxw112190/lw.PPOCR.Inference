@@ -35,6 +35,13 @@ result = engine.run(pixels, width=640, height=480, stride=1920)
 # from a JPEG/PNG file (needs opencv-python)
 result = engine.run_file("photo.jpg")
 
+# already-cropped BGR24 text lines (no detector call)
+single = engine.recognize(crop_pixels, crop_width, crop_height, crop_stride)
+batch = engine.recognize_batch([
+    (crop1, width1, height1, stride1, 2),
+    (crop2, width2, height2, stride2, 2),
+])
+
 # inspect
 for region in result.regions:
     print(f"[{region.text}] score={region.score:.4f}")

@@ -91,6 +91,34 @@ class _LwResult(Structure):
     ]
 
 
+class _LwRecognition(Structure):
+    _fields_ = [
+        ("struct_size", c_uint32),
+        ("api_version", c_uint32),
+        ("source_index", c_uint64),
+        ("text_utf8", c_char_p),
+        ("score", c_float),
+        ("cls_label", c_int32),
+        ("cls_score", c_float),
+        ("reserved_i32", c_int32 * 4),
+        ("reserved_ptr", c_void_p * 2),
+    ]
+
+
+class _LwRecognitionResult(Structure):
+    _fields_ = [
+        ("struct_size", c_uint32),
+        ("api_version", c_uint32),
+        ("item_count", c_uint64),
+        ("items", POINTER(_LwRecognition)),
+        ("classifier", _LwTiming),
+        ("recognizer", _LwTiming),
+        ("pipeline", _LwTiming),
+        ("reserved_i32", c_int32 * 8),
+        ("reserved_ptr", c_void_p * 4),
+    ]
+
+
 class _LwImage(Structure):
     _fields_ = [
         ("struct_size", c_uint32),
@@ -164,6 +192,23 @@ class OcrTiming:
 class OcrResult:
     regions: List[OcrTextRegion] = field(default_factory=list)
     detector: OcrTiming = field(default_factory=OcrTiming)
+    classifier: OcrTiming = field(default_factory=OcrTiming)
+    recognizer: OcrTiming = field(default_factory=OcrTiming)
+    pipeline: OcrTiming = field(default_factory=OcrTiming)
+
+
+@dataclass
+class OcrRecognition:
+    source_index: int
+    text: str
+    score: float
+    cls_label: int = -1
+    cls_score: float = 0.0
+
+
+@dataclass
+class OcrRecognitionResult:
+    items: List[OcrRecognition] = field(default_factory=list)
     classifier: OcrTiming = field(default_factory=OcrTiming)
     recognizer: OcrTiming = field(default_factory=OcrTiming)
     pipeline: OcrTiming = field(default_factory=OcrTiming)
@@ -269,7 +314,8 @@ class OcrEngine:
         image = _LwImage()
         image.struct_size  = ctypes.sizeof(_LwImage)
         image.api_version  = 1
-        image.data         = (ctypes.c_char * len(pixels)).from_buffer_copy(pixels)
+        pixel_buffer = (ctypes.c_ubyte * len(pixels)).from_buffer_copy(pixels)
+        image.data         = ctypes.cast(pixel_buffer, c_void_p)
         image.data_size    = len(pixels)
         image.width        = width
         image.height       = height
@@ -283,10 +329,10 @@ class OcrEngine:
             msg = self._last_error()
             raise RuntimeError(f"lw_ppocr_run failed (status={status}): {msg}")
 
-        native = result_ptr.contents
-        result = self._copy_result(native)
-        self._dll.lw_ppocr_result_free(self._handle, result_ptr)
-        return result
+        try:
+            return self._copy_result(result_ptr.contents)
+        finally:
+            self._dll.lw_ppocr_result_free(self._handle, result_ptr)
 
     def run_file(self, path: str) -> OcrResult:
         """Decode a JPEG/PNG image with OpenCV and run OCR.
@@ -306,6 +352,50 @@ class OcrEngine:
             int(img.strides[0]),
             pixel_format=2,  # BGR24
         )
+
+    def recognize(self, pixels: bytes, width: int, height: int, stride: int,
+                  pixel_format: int = 2) -> OcrRecognitionResult:
+        """Recognize one already-cropped text-line image without detection."""
+        return self.recognize_batch([
+            (pixels, width, height, stride, pixel_format)
+        ])
+
+    def recognize_batch(
+        self, images: List[Tuple[bytes, int, int, int, int]]
+    ) -> OcrRecognitionResult:
+        """Recognize cropped text-line images as one ordered batch."""
+        if not images:
+            raise ValueError("at least one cropped image is required")
+        native_images = (_LwImage * len(images))()
+        buffers = []
+        for index, (pixels, width, height, stride, pixel_format) in enumerate(images):
+            if width <= 0 or height <= 0 or stride <= 0:
+                raise ValueError(f"image {index} has invalid dimensions or stride")
+            if stride * height > len(pixels):
+                raise ValueError(f"image {index} buffer is too small")
+            buffer = (ctypes.c_ubyte * len(pixels)).from_buffer_copy(pixels)
+            buffers.append(buffer)
+            native_images[index].struct_size = ctypes.sizeof(_LwImage)
+            native_images[index].api_version = 1
+            native_images[index].data = ctypes.cast(buffer, c_void_p)
+            native_images[index].data_size = len(pixels)
+            native_images[index].width = width
+            native_images[index].height = height
+            native_images[index].stride = stride
+            native_images[index].pixel_format = pixel_format
+
+        result_ptr = POINTER(_LwRecognitionResult)()
+        status = self._dll.lw_ppocr_recognize_batch(
+            self._handle, native_images, len(images), byref(result_ptr))
+        if status != 0 or not result_ptr:
+            msg = self._last_error()
+            raise RuntimeError(
+                f"lw_ppocr_recognize_batch failed (status={status}): {msg}")
+        try:
+            return self._copy_recognition_result(result_ptr.contents)
+        finally:
+            self._dll.lw_ppocr_recognition_result_free(
+                self._handle, result_ptr)
 
     def close(self):
         """Destroy the engine.  Not thread-safe with concurrent inference."""
@@ -330,6 +420,13 @@ class OcrEngine:
             c_void_p, POINTER(_LwImage), POINTER(POINTER(_LwResult))]
         dll.lw_ppocr_result_free.restype = None
         dll.lw_ppocr_result_free.argtypes = [c_void_p, POINTER(_LwResult)]
+        dll.lw_ppocr_recognize_batch.restype = c_int32
+        dll.lw_ppocr_recognize_batch.argtypes = [
+            c_void_p, POINTER(_LwImage), c_uint64,
+            POINTER(POINTER(_LwRecognitionResult))]
+        dll.lw_ppocr_recognition_result_free.restype = None
+        dll.lw_ppocr_recognition_result_free.argtypes = [
+            c_void_p, POINTER(_LwRecognitionResult)]
         dll.lw_ppocr_destroy.restype = None
         dll.lw_ppocr_destroy.argtypes = [POINTER(c_void_p)]
         dll.lw_ppocr_get_last_error.restype = c_uint64
@@ -389,6 +486,33 @@ class OcrEngine:
                 native.pipeline.postprocess_ms,
                 native.pipeline.total_ms,
             ),
+        )
+
+    @staticmethod
+    def _copy_recognition_result(
+        native: _LwRecognitionResult
+    ) -> OcrRecognitionResult:
+        items = []
+        for index in range(native.item_count):
+            item = native.items[index]
+            items.append(OcrRecognition(
+                source_index=item.source_index,
+                text=item.text_utf8.decode("utf-8") if item.text_utf8 else "",
+                score=item.score,
+                cls_label=item.cls_label,
+                cls_score=item.cls_score,
+            ))
+        return OcrRecognitionResult(
+            items=items,
+            classifier=OcrTiming(native.classifier.preprocess_ms,
+                native.classifier.inference_ms, native.classifier.postprocess_ms,
+                native.classifier.total_ms),
+            recognizer=OcrTiming(native.recognizer.preprocess_ms,
+                native.recognizer.inference_ms, native.recognizer.postprocess_ms,
+                native.recognizer.total_ms),
+            pipeline=OcrTiming(native.pipeline.preprocess_ms,
+                native.pipeline.inference_ms, native.pipeline.postprocess_ms,
+                native.pipeline.total_ms),
         )
 
 

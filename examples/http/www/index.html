@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>lw.PPOCR 在线体验</title>
+  <style>
+    :root { color-scheme: dark; font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #0b1020; color: #e8eefc; }
+    main { width: min(1180px, calc(100% - 28px)); margin: 30px auto 50px; }
+    h1 { margin: 0 0 6px; font-size: 28px; }
+    .sub { margin: 0; color: #8fa2c7; }
+    .card { margin-top: 18px; padding: 18px; border: 1px solid #293755; border-radius: 14px; background: #121a2d; box-shadow: 0 12px 34px #03071255; }
+    .toolbar { display: grid; grid-template-columns: minmax(260px,1fr) 190px 220px auto; gap: 12px; align-items: end; }
+    label { display: grid; gap: 7px; color: #9badcf; font-size: 13px; }
+    input, select, button { min-height: 42px; border: 1px solid #344563; border-radius: 8px; font: inherit; }
+    input, select { padding: 8px 10px; color: #e8eefc; background: #0b1222; }
+    button { padding: 8px 20px; color: white; background: #2878ff; cursor: pointer; font-weight: 650; border-color: #438aff; }
+    button:disabled { opacity: .55; cursor: wait; }
+    #status { min-height: 24px; margin: 14px 0 0; color: #78b7ff; }
+    .stage { display: none; margin-top: 16px; overflow: auto; padding: 10px; border-radius: 10px; background: #070b14; text-align: center; }
+    canvas { display: block; max-width: 100%; height: auto; margin: auto; border-radius: 6px; }
+    .timings { display: grid; grid-template-columns: repeat(6,minmax(110px,1fr)); gap: 9px; margin-top: 13px; }
+    .metric { padding: 10px 12px; border-radius: 9px; background: #0b1222; border: 1px solid #263653; }
+    .metric span { display: block; color: #879abd; font-size: 12px; }
+    .metric strong { display: block; margin-top: 3px; color: #a9d1ff; font-size: 17px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { padding: 9px; border-bottom: 1px solid #293755; text-align: left; vertical-align: top; }
+    th { color: #8fa2c7; font-size: 12px; }
+    td:first-child { width: 48px; color: #7fb8ff; }
+    pre { overflow: auto; max-height: 330px; padding: 12px; background: #090f1e; border-radius: 8px; color: #cbd8ef; }
+    @media (max-width: 900px) { .toolbar { grid-template-columns: 1fr 1fr; } .timings { grid-template-columns: repeat(3,1fr); } }
+    @media (max-width: 560px) { .toolbar { grid-template-columns: 1fr; } .timings { grid-template-columns: repeat(2,1fr); } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>lw.PPOCR 在线体验</h1>
+  <p class="sub">完整 OCR 会绘制文字区域；“仅识别”适合已经裁剪好的单行文字图片。</p>
+  <section class="card">
+    <div class="toolbar">
+      <label>图片（JPEG / PNG / BMP / GIF / TIFF）<input id="file" type="file" accept="image/*"></label>
+      <label>处理方式<select id="mode"><option value="ocr">完整 OCR</option><option value="recognize">仅文字识别</option></select></label>
+      <label>API Key（未配置可留空）<input id="key" type="password" autocomplete="off"></label>
+      <button id="run" disabled>开始识别</button>
+    </div>
+    <div id="stage" class="stage"><canvas id="canvas"></canvas></div>
+    <div id="status">正在检查服务状态……</div>
+    <div id="timings" class="timings"></div>
+  </section>
+  <section class="card">
+    <strong>识别结果</strong>
+    <table><thead><tr><th>#</th><th>文本</th><th>置信度</th><th>方向分类</th><th>坐标</th></tr></thead><tbody id="rows"></tbody></table>
+  </section>
+  <section class="card"><strong>JSON 响应</strong><pre id="json">尚未请求</pre></section>
+</main>
+<script>
+  const file = document.querySelector('#file');
+  const mode = document.querySelector('#mode');
+  const run = document.querySelector('#run');
+  const status = document.querySelector('#status');
+  const stage = document.querySelector('#stage');
+  const canvas = document.querySelector('#canvas');
+  const ctx = canvas.getContext('2d');
+  const rows = document.querySelector('#rows');
+  const output = document.querySelector('#json');
+  const timings = document.querySelector('#timings');
+  const sourceImage = new Image();
+  let imageBase64 = '';
+  let lastRegions = [];
+
+  fetch('/health').then(r => r.json()).then(data => {
+    status.textContent = `服务就绪：${data.backend_name || data.backend}`;
+  }).catch(error => { status.textContent = `服务检查失败：${error}`; });
+
+  function redraw(regions = lastRegions) {
+    if (!sourceImage.naturalWidth) return;
+    const scale = Math.min(1, 1600 / sourceImage.naturalWidth);
+    canvas.width = Math.max(1, Math.round(sourceImage.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(sourceImage.naturalHeight * scale));
+    ctx.drawImage(sourceImage, 0, 0, canvas.width, canvas.height);
+    lastRegions = regions;
+    if (!regions.length) return;
+    const sx = canvas.width / sourceImage.naturalWidth;
+    const sy = canvas.height / sourceImage.naturalHeight;
+    ctx.lineWidth = Math.max(2, canvas.width / 650);
+    ctx.font = `${Math.max(13, Math.round(canvas.width / 65))}px "Microsoft YaHei UI", sans-serif`;
+    regions.forEach((region, index) => {
+      const points = [1,2,3,4].map(i => [Number(region['x'+i]) * sx, Number(region['y'+i]) * sy]);
+      ctx.beginPath(); ctx.moveTo(points[0][0], points[0][1]);
+      points.slice(1).forEach(p => ctx.lineTo(p[0], p[1])); ctx.closePath();
+      ctx.strokeStyle = '#18e1a5'; ctx.stroke();
+      const label = `${index + 1} ${region.text || ''}`;
+      const x = Math.max(0, points[0][0]);
+      const y = Math.max(18, points[0][1]);
+      const width = ctx.measureText(label).width + 10;
+      ctx.fillStyle = '#061d18dd'; ctx.fillRect(x, y - 18, width, 20);
+      ctx.fillStyle = '#8dffe0'; ctx.fillText(label, x + 5, y - 3);
+    });
+  }
+
+  file.addEventListener('change', () => {
+    const selected = file.files[0];
+    if (!selected) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      imageBase64 = reader.result;
+      sourceImage.onload = () => { stage.style.display = 'block'; redraw([]); };
+      sourceImage.src = imageBase64;
+      run.disabled = false;
+      status.textContent = `已选择 ${selected.name}`;
+      timings.replaceChildren(); rows.replaceChildren();
+    };
+    reader.readAsDataURL(selected);
+  });
+
+  function addCell(tr, value) {
+    const td = document.createElement('td'); td.textContent = value; tr.appendChild(td);
+  }
+
+  function renderTiming(value, clientMs) {
+    timings.replaceChildren();
+    const entries = [
+      ['图片解码', value.decode_ms],
+      ['文本检测', value.detector?.total_ms],
+      ['方向分类', value.classifier?.total_ms],
+      ['文字识别', value.recognizer?.total_ms],
+      ['推理管线', value.pipeline?.total_ms],
+      ['HTTP 总耗时', value.server_total_ms ?? clientMs]
+    ];
+    entries.forEach(([name, number]) => {
+      const div = document.createElement('div'); div.className = 'metric';
+      const label = document.createElement('span'); label.textContent = name;
+      const strong = document.createElement('strong');
+      strong.textContent = Number.isFinite(Number(number)) ? `${Number(number).toFixed(2)} ms` : '—';
+      div.append(label, strong); timings.appendChild(div);
+    });
+  }
+
+  run.addEventListener('click', async () => {
+    run.disabled = true; status.textContent = '正在识别……'; rows.replaceChildren(); redraw([]);
+    const started = performance.now();
+    try {
+      const headers = {'Content-Type': 'application/json'};
+      const key = document.querySelector('#key').value;
+      if (key) headers['X-API-Key'] = key;
+      const recognitionOnly = mode.value === 'recognize';
+      const response = await fetch(recognitionOnly ? '/api/recognize' : '/api/ocr', {
+        method: 'POST', headers, body: JSON.stringify({image_base64: imageBase64})
+      });
+      const data = await response.json();
+      output.textContent = JSON.stringify(data, null, 2);
+      if (!response.ok || !data.ok) throw new Error(data.error || `HTTP ${response.status}`);
+      const items = Array.isArray(data.result) ? data.result : [];
+      items.forEach((item, index) => {
+        const tr = document.createElement('tr');
+        const hasBox = !recognitionOnly && Number.isFinite(Number(item.x1));
+        const points = hasBox ? [1,2,3,4].map(i =>
+          `(${Number(item['x'+i]).toFixed(0)}, ${Number(item['y'+i]).toFixed(0)})`).join(' ') : '—';
+        addCell(tr, index + 1); addCell(tr, item.text || '');
+        addCell(tr, Number(item.score || 0).toFixed(4));
+        addCell(tr, item.cls_label >= 0 ? `${item.cls_label} / ${Number(item.cls_score || 0).toFixed(4)}` : '未启用');
+        addCell(tr, points); rows.appendChild(tr);
+      });
+      if (!recognitionOnly) redraw(items);
+      renderTiming(data.timing || {}, performance.now() - started);
+      status.textContent = `识别完成：${items.length} 个结果，服务端总耗时 ${Number(data.timing?.server_total_ms || 0).toFixed(2)} ms`;
+    } catch (error) {
+      status.textContent = `识别失败：${error.message}`;
+    } finally { run.disabled = false; }
+  });
+</script>
+</body>
+</html>

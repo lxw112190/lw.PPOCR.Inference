@@ -17,6 +17,8 @@ public:
     OpenCvOcrEngine& operator=(const OpenCvOcrEngine&) = delete;
 
     core::PipelineResult Run(const lw_ppocr_image& image);
+    core::RecognitionResult RecognizeBatch(
+        const lw_ppocr_image* images, uint64_t image_count);
     void Log(lw_ppocr_log_level level, const std::string& message) const noexcept;
 
 private:
