@@ -117,6 +117,7 @@ install(FILES
     docs/http-service.md
     docs/linux-opencv.md
     docs/linux-onnxruntime.md
+    docs/linux-openvino.md
     models/model-manifest.schema.json
     DESTINATION docs
 )
@@ -175,9 +176,6 @@ if(LW_PPOCR_BUILD_ONNXRUNTIME_RUNTIME)
 endif()
 
 if(LW_PPOCR_BUILD_OPENVINO_RUNTIME)
-    if(NOT WIN32)
-        message(FATAL_ERROR "The initial Linux release supports OpenCV DNN only")
-    endif()
     if(NOT LW_PPOCR_OPENVINO_ROOT)
         message(FATAL_ERROR "LW_PPOCR_OPENVINO_ROOT is required")
     endif()

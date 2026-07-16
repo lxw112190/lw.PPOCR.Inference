@@ -117,6 +117,9 @@ def main() -> int:
                 library_paths.append(str(
                     package_dir / "runtimes" / "linux-x64" / "onnxruntime"
                 ))
+                library_paths.append(str(
+                    package_dir / "runtimes" / "linux-x64" / "openvino"
+                ))
             if environment.get("LD_LIBRARY_PATH"):
                 library_paths.append(environment["LD_LIBRARY_PATH"])
             environment["LD_LIBRARY_PATH"] = os.pathsep.join(library_paths)

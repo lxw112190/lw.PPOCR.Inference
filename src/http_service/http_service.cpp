@@ -451,7 +451,7 @@ void PrintStartupInfo(const ServiceConfig& config, bool service_mode) {
     std::ostringstream startup;
     startup
         << "============================================================\n"
-        << "lw.PPOCR.Inference HTTP Service v1.2.0\n"
+        << "lw.PPOCR.Inference HTTP Service v1.3.0\n"
         << "Author / 作者: 天天代码码天天\n"
         << "QQ: 819069052\n"
         << "============================================================\n"

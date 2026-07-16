@@ -11,6 +11,12 @@ RUNTIME_LIBRARY="runtimes/linux-x64/opencv/liblw.PPOCR.Runtime.OpenCVDNN.so"
 if [[ -e runtimes/linux-x64/onnxruntime/liblw.PPOCR.Runtime.ONNXRuntime.so ]]; then
   RUNTIME_LIBRARY="runtimes/linux-x64/onnxruntime/liblw.PPOCR.Runtime.ONNXRuntime.so"
 fi
+if [[ -e runtimes/linux-x64/openvino/liblw.PPOCR.Runtime.OpenVINO.so ]]; then
+  RUNTIME_LIBRARY="runtimes/linux-x64/openvino/liblw.PPOCR.Runtime.OpenVINO.so"
+fi
+
+RUNTIME_DIR="$(dirname -- "${RUNTIME_LIBRARY}")"
+export LD_LIBRARY_PATH="${PACKAGE_DIR}:${PACKAGE_DIR}/${RUNTIME_DIR}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 
 for binary in liblw.PPOCR.so.1 "${RUNTIME_LIBRARY}" lw-ppocr-http-service; do
   if ldd "${binary}" | grep -q "not found"; then

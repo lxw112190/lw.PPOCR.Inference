@@ -19,12 +19,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "lw"
             VALUE "FileDescription", "lw.PPOCR HTTP OCR and Windows service"
-            VALUE "FileVersion", "1.2.0"
+            VALUE "FileVersion", "1.3.0"
             VALUE "InternalName", "lw.PPOCR.HttpService.exe"
             VALUE "LegalCopyright", "Copyright (C) lw"
             VALUE "OriginalFilename", "lw.PPOCR.HttpService.exe"
             VALUE "ProductName", "lw.PPOCR.Inference"
-            VALUE "ProductVersion", "1.2.0"
+            VALUE "ProductVersion", "1.3.0"
         END
     END
     BLOCK "VarFileInfo"

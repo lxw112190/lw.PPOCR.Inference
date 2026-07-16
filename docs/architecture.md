@@ -89,6 +89,13 @@ runtimes/win-x64/
     cudart64_12.dll
 ```
 
+Linux uses the same backend isolation under `runtimes/linux-x64/`. The
+OpenVINO CPU package keeps `liblw.PPOCR.Runtime.OpenVINO.so`, OpenVINO core,
+the CPU plugin, ONNX frontend, oneTBB, hwloc, and the required OpenCV shared
+libraries in its private `openvino/` directory. The launch and systemd scripts
+add only that directory to `LD_LIBRARY_PATH`, so a system-installed OpenVINO or
+OpenCV cannot override the package dependencies.
+
 The loader accepts an explicit Runtime library path for tests and advanced
 embedding. Normal applications select only a backend and use the standard
 Runtime layout.

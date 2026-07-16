@@ -60,12 +60,18 @@ std::shared_ptr<ov::CompiledModel> OpenVinoEnvironment::Compile(
     if (existing != models_.end()) {
         return existing->second;
     }
-    auto model = std::make_shared<ov::CompiledModel>(
-        recognition_model && device_ == "CPU"
-            ? core_.compile_model(key.wstring(), device_,
+    const auto compile = [&](const auto& native_path) {
+        return recognition_model && device_ == "CPU"
+            ? core_.compile_model(native_path, device_,
                 ov::hint::performance_mode(ov::hint::PerformanceMode::THROUGHPUT),
                 ov::hint::num_requests(recognition_requests_))
-            : core_.compile_model(key.wstring(), device_));
+            : core_.compile_model(native_path, device_);
+    };
+#if defined(_WIN32)
+    auto model = std::make_shared<ov::CompiledModel>(compile(key.wstring()));
+#else
+    auto model = std::make_shared<ov::CompiledModel>(compile(key.string()));
+#endif
     models_.emplace(key, model);
     return model;
 }

@@ -13,6 +13,7 @@ apt-get install -y --no-install-recommends \
   curl \
   libgomp1 \
   libjpeg8 \
+  libnuma1 \
   libpng16-16 \
   libtiff5 \
   zlib1g

@@ -53,15 +53,15 @@
 | 分发要求 | 保留 LICENSE |
 | 状态 | ✅ `DirectML-MIT.txt` 已随附 |
 
-### OpenVINO 2026.2.0
+### OpenVINO 2026.2.0（Windows）/ 2025.2.0（Linux）
 
 | 项目 | 内容 |
 |---|---|
 | 许可证 / License | [Apache License 2.0](https://github.com/openvinotoolkit/openvino/blob/master/LICENSE) |
-| 使用方式 | 动态链接 (`openvino.dll`, `openvino_onnx_frontend.dll`, `openvino_intel_cpu_plugin.dll`, `tbb12.dll`, `tbbmalloc.dll`) |
+| 使用方式 | 动态链接；Windows 使用 DLL，Linux 使用官方 Ubuntu 20.04 归档中的 OpenVINO、ONNX frontend、CPU plugin 与 oneTBB `.so` |
 | 与 MIT 兼容性 | ✅ 兼容 |
 | 分发要求 | 保留 LICENSE 和分发材料；发布包已随附 |
-| 状态 | ✅ `openvino-APACHE-2.0.txt` 与 `openvino-EULA.txt` 已随附 |
+| 状态 | ✅ 仓库保留许可证副本；Linux 打包时另外复制官方归档 `docs/licensing/` 的完整材料到 `licenses/openvino-package/` |
 
 ### TensorRT 10.16.1.11
 
@@ -184,7 +184,7 @@ NVIDIA CUDA EULA 对 `cudart64_12.dll` 的再分发有类似规定。作为 CUDA
 | OpenCV 5.0.0 | Apache-2.0 | ✅ | LICENSE 已随附 |
 | ONNX Runtime 1.23.0 / 1.26.0 | MIT | ✅ | LICENSE 与第三方声明已随附 |
 | DirectML 1.15.4 | MIT | ✅ | LICENSE 已随附 |
-| OpenVINO 2026.2.0 | Apache-2.0 | ✅ | LICENSE 与分发材料已随附 |
+| OpenVINO 2026.2.0 / 2025.2.0 | Apache-2.0 | ✅ | Windows 通用材料已随附；Linux 包复制官方归档完整 licensing 目录 |
 | TensorRT 10.16.1.11 | NVIDIA 协议 | ⚠️ | 上游许可证引用 + 第三方声明 + README 声明 |
 | CUDA 12.6 Runtime | NVIDIA EULA | ⚠️ | EULA + README 声明 |
 | PP-OCRv6 tiny models | Apache-2.0 | ✅ | — |

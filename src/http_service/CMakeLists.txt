@@ -40,8 +40,8 @@ else()
     )
     set_target_properties(lw_ppocr_http_service PROPERTIES
         OUTPUT_NAME "lw-ppocr-http-service"
-        BUILD_RPATH "$ORIGIN;$ORIGIN/runtimes/linux-x64/opencv;$ORIGIN/runtimes/linux-x64/onnxruntime"
-        INSTALL_RPATH "$ORIGIN;$ORIGIN/runtimes/linux-x64/opencv;$ORIGIN/runtimes/linux-x64/onnxruntime"
+        BUILD_RPATH "$ORIGIN;$ORIGIN/runtimes/linux-x64/opencv;$ORIGIN/runtimes/linux-x64/onnxruntime;$ORIGIN/runtimes/linux-x64/openvino"
+        INSTALL_RPATH "$ORIGIN;$ORIGIN/runtimes/linux-x64/opencv;$ORIGIN/runtimes/linux-x64/onnxruntime;$ORIGIN/runtimes/linux-x64/openvino"
     )
 endif()
 

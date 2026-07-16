@@ -6,9 +6,11 @@ HTTP 服务基于 cpp-httplib，使用 JSON + Base64 接收图片，通过统一
 
 ## 快速使用
 
-Windows 解压任一后端拆分包后双击 `run-http-service.cmd`；Linux 解压 OpenCV DNN 或 ONNX Runtime 包后执行 `./run-http-service.sh`。浏览器访问：
+Windows 解压任一后端拆分包后双击 `run-http-service.cmd`；Linux 解压 OpenCV DNN、ONNX Runtime 或 OpenVINO 包后执行 `./run-http-service.sh`。浏览器访问：
 
 Linux ONNX Runtime 配置使用 `backend: "onnxruntime"`（也接受 `ort`），并通过 `backend_options.device` 选择 `cpu`、`cuda` 或 `auto`。CPU/GPU 动态库替换与 CUDA 依赖见 [Linux ONNX Runtime 部署说明](linux-onnxruntime.md)。
+
+Linux OpenVINO 配置使用 `backend: "openvino"` 与 `backend_options: {"device":"CPU"}`。当前预览包固定使用 OpenVINO 2025.2.0 CPU，包含私有运行库，不需要目标机器安装 OpenVINO SDK；详见 [Linux OpenVINO 部署说明](linux-openvino.md)。
 
 ```text
 http://127.0.0.1:8787/
@@ -117,7 +119,7 @@ lw.PPOCR.HttpService.exe --uninstall --config http-service.json
 
 ## Linux systemd
 
-Ubuntu 20.04 OpenCV DNN 包已经包含 HTTP 主程序、网页、模型、OpenCV 共享库和服务脚本。首次部署顺序如下：
+Ubuntu 20.04 的 OpenCV DNN、ONNX Runtime 与 OpenVINO 包均包含 HTTP 主程序、网页、模型、对应私有共享库和服务脚本。首次部署顺序如下：
 
 ```bash
 sudo ./install-deps-ubuntu.sh
@@ -147,4 +149,4 @@ curl http://127.0.0.1:8787/health
 sudo /opt/lw-ppocr/uninstall-systemd.sh
 ```
 
-验证脚本会临时使用 8787 端口，因此应在安装或启动 systemd 之前运行。如果服务无法启动，先查看 `journalctl -u lw-ppocr-http.service -n 100 --no-pager`，再使用 `ldd` 检查包内主程序和 Runtime 是否存在 `not found`。完整的 Artifact 解包、API 调用、局域网配置、防火墙和排错说明见 [Linux OpenCV DNN 部署](linux-opencv.md)。
+验证脚本会临时使用 8787 端口，因此应在安装或启动 systemd 之前运行。如果服务无法启动，先查看 `journalctl -u lw-ppocr-http.service -n 100 --no-pager`，再使用 `ldd` 检查包内主程序和 Runtime 是否存在 `not found`。完整说明见 [Linux OpenCV DNN](linux-opencv.md)、[Linux ONNX Runtime](linux-onnxruntime.md) 和 [Linux OpenVINO](linux-openvino.md) 部署文档。

@@ -1,0 +1,19 @@
+[Unit]
+Description=lw.PPOCR OpenVINO CPU HTTP OCR service
+After=network.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+WorkingDirectory=/opt/lw-ppocr
+Environment=LD_LIBRARY_PATH=/opt/lw-ppocr:/opt/lw-ppocr/runtimes/linux-x64/openvino
+ExecStart=/opt/lw-ppocr/lw-ppocr-http-service --console --config /opt/lw-ppocr/http-service.json
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+
+[Install]
+WantedBy=multi-user.target

@@ -4,11 +4,11 @@
 
 Author: **天天代码码天天** · QQ: `819069052`
 
-`lw.PPOCR.Inference` is a unified PP-OCR inference project. It exposes one stable C ABI and isolates OpenCV DNN, ONNX Runtime DirectML, portable ONNX Runtime, OpenVINO, and TensorRT as independent Runtime plugins. Windows keeps its four established Runtimes; Linux supports OpenCV DNN and is adding an ONNX Runtime CPU/CUDA Runtime.
+`lw.PPOCR.Inference` is a unified PP-OCR inference project. It exposes one stable C ABI and isolates OpenCV DNN, ONNX Runtime DirectML, portable ONNX Runtime, OpenVINO, and TensorRT as independent Runtime plugins. Windows keeps its four established Runtimes; Linux has validated OpenCV DNN and ONNX Runtime packages and is adding an OpenVINO CPU Runtime.
 
 The current stable release is **v1.1.0**. API v1 and its ABI are frozen. v1.1.0 adds recognition-only calls, the HTTP service, and interactive demos without breaking v1.0.0 callers. See the [v1.1.0 release notes](docs/releases/v1.1.0.md).
 
-The **v1.2.0 Linux OpenCV DNN release** targets Ubuntu 20.04 x86_64 and includes full OCR, recognition-only inference, the browser test page, and systemd integration. Development is now underway on the separate **v1.3.0 Linux ONNX Runtime CPU/CUDA** package; see [Linux ONNX Runtime deployment](docs/linux-onnxruntime.md).
+The **v1.2.0 Linux OpenCV DNN release** targets Ubuntu 20.04 x86_64 and includes full OCR, recognition-only inference, the browser test page, and systemd integration. The separate **v1.3.0 Linux ONNX Runtime CPU/CUDA** package has passed CI and Ubuntu VM validation. A **v1.3.0 Linux OpenVINO CPU** package is now in CI preview; see [Linux OpenVINO deployment](docs/linux-openvino.md).
 
 Applications only change backend configuration when switching inference frameworks. They do not need to rewrite the OCR workflow. In addition to C#, any language capable of calling a C DLL can integrate with the project, including C, C++, Python, Java, Delphi, Go, and Rust.
 
@@ -53,7 +53,7 @@ golden correctness suite. Version 1.0.0 formally froze API v1 and its ABI. See
 
 The current stable OpenVINO Runtime uses CPU. DirectML can use either CPU or GPU from the demo. TensorRT always requires an NVIDIA GPU.
 
-The Linux OpenCV package bundles minimal OpenCV 5.0 shared libraries. The separate Linux ONNX Runtime package uses the official ONNX Runtime 1.26.0 CPU archive for CI and can be switched to the matching GPU archive by replacing the complete `libonnxruntime*.so*` set. DirectML remains Windows-only.
+The Linux OpenCV package bundles minimal OpenCV 5.0 shared libraries. The separate Linux ONNX Runtime package uses the official ONNX Runtime 1.26.0 CPU archive for CI and can be switched to the matching GPU archive by replacing the complete `libonnxruntime*.so*` set. The Linux OpenVINO package pins the official OpenVINO 2025.2.0 Ubuntu 20.04 archive and is released as CPU-only. DirectML remains Windows-only.
 
 ## Architecture
 
@@ -202,6 +202,21 @@ CI builds this package against the official ONNX Runtime 1.26.0 CPU archive. It 
 ```
 
 `cpu` forces CPU, `cuda` requires CUDA and fails fast when unavailable, and `auto` attempts CUDA before falling back to CPU. See the [complete Linux ONNX Runtime guide](docs/linux-onnxruntime.md).
+
+### Linux OpenVINO CPU Preview
+
+The CI artifact bundles OpenVINO 2025.2.0 CPU Runtime, oneTBB, the ONNX frontend, models, browser page, and systemd files. It can be verified and started without installing an OpenVINO SDK:
+
+```bash
+sha256sum -c lw.PPOCR.Inference-v1.3.0-preview.1-linux-x64-openvino-cpu.tar.gz.sha256
+tar -xzf lw.PPOCR.Inference-v1.3.0-preview.1-linux-x64-openvino-cpu.tar.gz
+cd lw.PPOCR.Inference-v1.3.0-preview.1-linux-x64-openvino-cpu
+sudo ./install-deps-ubuntu.sh
+./verify-linux-package.sh
+./run-http-service.sh
+```
+
+The preview accepts `"backend":"openvino"` and `"backend_options":{"device":"CPU"}` only. See the [complete Linux OpenVINO guide](docs/linux-openvino.md) for API Key, recognition-only, systemd, LAN, and troubleshooting instructions.
 
 ## CLI Examples
 
@@ -513,8 +528,8 @@ you do not accept those terms.
 
 ## Project Status
 
-The four established Windows Runtimes and the Linux OpenCV Runtime have passed end-to-end tests with real models. The Linux ONNX Runtime CPU/CUDA backend is now in CI and real-machine preview validation.
+The four established Windows Runtimes and the Linux OpenCV Runtime have passed end-to-end tests with real models. Linux ONNX Runtime has passed CI and Ubuntu VM validation. Linux OpenVINO CPU is now in independent CI and real-machine preview validation.
 
 See the [performance report](docs/performance-report.md) for the test hardware, SDK versions, model and image hashes, parameters, and multi-run statistics for all four backends.
 
-The current stable Linux release is **v1.2.0 OpenCV DNN**. `LW_PPOCR_API_VERSION` remains `1`, and the v1.0.0 ABI freeze remains in force. The new ONNX Runtime backend appends a backend value and an isolated Runtime without renumbering existing values.
+The current stable Linux release is **v1.2.0 OpenCV DNN**. Linux ONNX Runtime has passed CI and Ubuntu VM validation, while Linux OpenVINO CPU is in CI preview. `LW_PPOCR_API_VERSION` remains `1`, and the v1.0.0 ABI freeze remains in force; the Linux Runtimes do not renumber existing backend values or change public structure layouts.

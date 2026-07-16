@@ -60,11 +60,13 @@
 |---|---|---|---|---|
 | Windows 10 22H2 | AMD Ryzen 7 7735H | 2026.2.0 (21903) | v0.2.0 | ✅ |
 | Windows 11 | — | 2026.2.0 | — | Planned |
+| Ubuntu 20.04 x64 | x86-64 CPU | 2025.2.0 Ubuntu 20.04 官方归档 | v1.3.0-preview.1 | CI 待运行 |
 
 **已知限制:**
 - **禁止 GPU。** OpenCL mapping failure (`clEnqueueMapBuffer: CL_INVALID_VALUE`) 已复现，稳定版本中 GPU 选择会被拒绝。
 - Recognition concurrency 上限为 8。
 - 曾出现 CPU GroupConvolution `can't alloc`，需继续做长循环验证。
+- Linux 预览包自包含 OpenVINO、oneTBB、ONNX frontend 和最小 OpenCV 共享库，当前同样只允许 `CPU`。
 
 ---
 
@@ -119,7 +121,7 @@
 
 | 要求 | 规格 |
 |---|---|
-| OS | Windows 10 x64 (build 19041+) 或 Windows 11 x64 |
+| OS | Windows 10/11 x64；Linux 包以 Ubuntu 20.04 x64 为构建兼容基线 |
 | CPU | x86-64 with AVX2 (OpenCV DNN / OpenVINO) |
 | 内存 | ≥ 4 GB（模型加载 + 推理；实际取决于图片尺寸和并发数） |
 | GPU (DirectML) | DirectX 12 capable, WDDM 2.0+ |
@@ -134,7 +136,7 @@
 |---|---|
 | 32-bit (x86) | 项目仅编译 x64；32-bit 未测试 |
 | Windows 7 / 8 / 8.1 | 部分 SDK（DirectML、最新 OpenCV/ORT）不再支持 |
-| Linux / macOS | 项目当前仅面向 Windows；跨平台为远期目标 |
+| macOS | 尚未实现对应 Runtime 与部署包 |
 | ARM64 Windows | 未测试；部分 SDK 无 ARM64 原生包 |
 | OpenVINO GPU | 已复现 OpenCL mapping failure，稳定版本禁用 |
 | TensorRT INT8 | 无校准数据和完整准确率验证 |
