@@ -33,15 +33,15 @@
 | 分发要求 | 保留 NOTICE 和 LICENSE；发布包随附 `opencv-APACHE-2.0.txt` |
 | 状态 | ✅ 许可证文本已随附 |
 
-### ONNX Runtime 1.23.0
+### ONNX Runtime 1.23.0 / 1.26.0
 
 | 项目 | 内容 |
 |---|---|
 | 许可证 / License | [MIT License](https://github.com/microsoft/onnxruntime/blob/main/LICENSE) |
-| 使用方式 | 动态链接 (`onnxruntime.dll`, `onnxruntime_providers_shared.dll`) |
+| 使用方式 | 动态链接（Windows DLL；Linux `libonnxruntime*.so*`） |
 | 与 MIT 兼容性 | ✅ 同许可证 |
 | 分发要求 | 保留 LICENSE 和第三方声明；发布包均已随附 |
-| 状态 | ✅ `onnxruntime-MIT.txt` 与 `onnxruntime-ThirdPartyNotices.txt` 已随附 |
+| 状态 | ✅ 通用声明已随附；Linux 1.26.0 构建还会从官方包安装该包对应的 LICENSE 与 ThirdPartyNotices |
 
 ### DirectML 1.15.4
 
@@ -182,7 +182,7 @@ NVIDIA CUDA EULA 对 `cudart64_12.dll` 的再分发有类似规定。作为 CUDA
 | lw.PPOCR.Inference | MIT | ✅ | — |
 | Clipper 6.4.2 | BSL-1.0 | ✅ | 已随附 LICENSE |
 | OpenCV 5.0.0 | Apache-2.0 | ✅ | LICENSE 已随附 |
-| ONNX Runtime 1.23.0 | MIT | ✅ | LICENSE 与第三方声明已随附 |
+| ONNX Runtime 1.23.0 / 1.26.0 | MIT | ✅ | LICENSE 与第三方声明已随附 |
 | DirectML 1.15.4 | MIT | ✅ | LICENSE 已随附 |
 | OpenVINO 2026.2.0 | Apache-2.0 | ✅ | LICENSE 与分发材料已随附 |
 | TensorRT 10.16.1.11 | NVIDIA 协议 | ⚠️ | 上游许可证引用 + 第三方声明 + README 声明 |

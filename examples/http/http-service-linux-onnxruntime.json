@@ -1,0 +1,19 @@
+{
+  "listen_host": "127.0.0.1",
+  "port": 8787,
+  "backend": "onnxruntime",
+  "runtime_root": "runtimes/linux-x64",
+  "model_manifest": "models/ppocrv6-tiny/model.json",
+  "web_root": "www",
+  "device_id": 0,
+  "backend_options": {
+    "device": "cpu"
+  },
+  "enable_classifier": true,
+  "worker_threads": 4,
+  "max_request_bytes": 20971520,
+  "max_image_pixels": 40000000,
+  "api_key": "",
+  "service_name": "lw.PPOCR.HttpService.onnxruntime",
+  "service_display_name": "lw.PPOCR HTTP OCR Service (ONNX Runtime)"
+}

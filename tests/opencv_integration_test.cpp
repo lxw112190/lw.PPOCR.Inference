@@ -179,6 +179,7 @@ int main(int argc, char** argv) {
             : std::filesystem::path();
         const std::string runtime_name = argc >= 8 ? argv[6] : "opencv";
         const bool use_directml = runtime_name == "directml";
+        const bool use_onnxruntime = runtime_name == "onnxruntime";
         const bool use_openvino = runtime_name == "openvino";
         const bool use_tensorrt = runtime_name == "tensorrt";
         WriteManifest(manifest, argv[2], argv[3], argv[4], classifier,
@@ -196,12 +197,15 @@ int main(int argc, char** argv) {
         config.api_version = LW_PPOCR_API_VERSION;
         const lw_ppocr_backend backend = use_directml
             ? LW_PPOCR_BACKEND_DIRECTML
-            : (use_openvino ? LW_PPOCR_BACKEND_OPENVINO
-                            : (use_tensorrt ? LW_PPOCR_BACKEND_TENSORRT
-                                           : LW_PPOCR_BACKEND_OPENCV_DNN));
+            : (use_onnxruntime ? LW_PPOCR_BACKEND_ONNXRUNTIME
+                : (use_openvino ? LW_PPOCR_BACKEND_OPENVINO
+                                : (use_tensorrt ? LW_PPOCR_BACKEND_TENSORRT
+                                               : LW_PPOCR_BACKEND_OPENCV_DNN)));
         const std::string backend_options = use_openvino
             ? std::string("{\"device\":\"") + argv[7] + "\"}"
-            : std::string();
+            : (use_onnxruntime
+                ? std::string("{\"device\":\"") + argv[7] + "\"}"
+                               : std::string());
         config.backend = backend;
         config.device_id = use_directml || use_tensorrt ? std::stoi(argv[7]) : 0;
         config.backend_options_json_utf8 = backend_options.empty()
@@ -219,7 +223,7 @@ int main(int argc, char** argv) {
         config.cls_batch_size = 8;
         config.rec_batch_size = use_openvino ? 1 : 4;
         config.rec_concurrency = use_openvino ? 8
-            : ((use_directml || use_tensorrt) ? 4 : 2);
+            : ((use_directml || use_onnxruntime || use_tensorrt) ? 4 : 2);
         config.log_level = LW_PPOCR_LOG_INFO;
         config.log_callback = &LogCallback;
 
@@ -406,7 +410,8 @@ int main(int argc, char** argv) {
         }
         std::cout << (use_directml ? "DirectML"
             : (use_openvino ? "OpenVINO"
-                            : (use_tensorrt ? "TensorRT" : "OpenCV DNN")))
+                            : (use_tensorrt ? "TensorRT"
+                                : (use_onnxruntime ? "ONNX Runtime" : "OpenCV DNN"))))
                   << " integration test passed\n";
         return 0;
     } catch (const std::exception& exception) {

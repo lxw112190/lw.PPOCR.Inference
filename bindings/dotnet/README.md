@@ -16,7 +16,7 @@ and structured-result support.
 
 The `samples/UnifiedCli` project is a small backend-neutral executable. It
 decodes common Windows image formats into BGR24 and demonstrates that changing
-from OpenCV DNN to DirectML, OpenVINO, or TensorRT requires no application API
+from OpenCV DNN to DirectML, ONNX Runtime, OpenVINO, or TensorRT requires no application API
 change:
 
 ```powershell

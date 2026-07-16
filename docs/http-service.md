@@ -6,7 +6,9 @@ HTTP 服务基于 cpp-httplib，使用 JSON + Base64 接收图片，通过统一
 
 ## 快速使用
 
-Windows 解压任一后端拆分包后双击 `run-http-service.cmd`；Linux 解压 OpenCV DNN 包后执行 `./run-http-service.sh`。浏览器访问：
+Windows 解压任一后端拆分包后双击 `run-http-service.cmd`；Linux 解压 OpenCV DNN 或 ONNX Runtime 包后执行 `./run-http-service.sh`。浏览器访问：
+
+Linux ONNX Runtime 配置使用 `backend: "onnxruntime"`（也接受 `ort`），并通过 `backend_options.device` 选择 `cpu`、`cuda` 或 `auto`。CPU/GPU 动态库替换与 CUDA 依赖见 [Linux ONNX Runtime 部署说明](linux-onnxruntime.md)。
 
 ```text
 http://127.0.0.1:8787/

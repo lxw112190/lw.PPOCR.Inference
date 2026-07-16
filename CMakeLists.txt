@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(lw.PPOCR.Inference VERSION 1.2.0 LANGUAGES C CXX)
+project(lw.PPOCR.Inference VERSION 1.3.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -14,11 +14,13 @@ option(LW_PPOCR_BUILD_TESTS "Build ABI and loader smoke tests" ON)
 option(LW_PPOCR_BUILD_STUB_RUNTIME "Build the contract-testing Stub Runtime" ON)
 option(LW_PPOCR_BUILD_OPENCV_RUNTIME "Build the OpenCV DNN Runtime" OFF)
 option(LW_PPOCR_BUILD_DIRECTML_RUNTIME "Build the ONNX Runtime DirectML Runtime" OFF)
+option(LW_PPOCR_BUILD_ONNXRUNTIME_RUNTIME "Build the portable ONNX Runtime CPU/CUDA Runtime" OFF)
 option(LW_PPOCR_BUILD_OPENVINO_RUNTIME "Build the OpenVINO Runtime" OFF)
 option(LW_PPOCR_BUILD_TENSORRT_RUNTIME "Build the TensorRT Runtime" OFF)
 option(LW_PPOCR_BUILD_HTTP_SERVICE "Build the cross-platform HTTP API service host" ON)
 set(LW_PPOCR_OPENCV_ROOT "" CACHE PATH "OpenCV distribution root containing OpenCVConfig.cmake")
 set(LW_PPOCR_ONNXRUNTIME_DML_ROOT "" CACHE PATH "ONNX Runtime DirectML package root")
+set(LW_PPOCR_ONNXRUNTIME_ROOT "" CACHE PATH "Official ONNX Runtime CPU or GPU package root")
 set(LW_PPOCR_DIRECTML_DLL "" CACHE FILEPATH "DirectML.dll distributed with ONNX Runtime DirectML")
 set(LW_PPOCR_OPENVINO_ROOT "" CACHE PATH "OpenVINO toolkit root containing runtime/cmake/OpenVINOConfig.cmake")
 set(LW_PPOCR_TENSORRT_ROOT "" CACHE PATH "TensorRT root containing include, lib, and bin")
@@ -114,6 +116,7 @@ install(FILES
     docs/tensorrt-engines.md
     docs/http-service.md
     docs/linux-opencv.md
+    docs/linux-onnxruntime.md
     models/model-manifest.schema.json
     DESTINATION docs
 )
@@ -135,6 +138,7 @@ if(LW_PPOCR_BUILD_STUB_RUNTIME)
 endif()
 
 if(LW_PPOCR_BUILD_OPENCV_RUNTIME OR LW_PPOCR_BUILD_DIRECTML_RUNTIME OR
+   LW_PPOCR_BUILD_ONNXRUNTIME_RUNTIME OR
    LW_PPOCR_BUILD_OPENVINO_RUNTIME OR LW_PPOCR_BUILD_TENSORRT_RUNTIME)
     if(LW_PPOCR_OPENCV_ROOT)
         find_package(OpenCV CONFIG REQUIRED
@@ -161,6 +165,13 @@ if(LW_PPOCR_BUILD_DIRECTML_RUNTIME)
         message(FATAL_ERROR "LW_PPOCR_ONNXRUNTIME_DML_ROOT is required")
     endif()
     add_subdirectory(src/runtimes/directml)
+endif()
+
+if(LW_PPOCR_BUILD_ONNXRUNTIME_RUNTIME)
+    if(NOT LW_PPOCR_ONNXRUNTIME_ROOT)
+        message(FATAL_ERROR "LW_PPOCR_ONNXRUNTIME_ROOT is required")
+    endif()
+    add_subdirectory(src/runtimes/onnxruntime)
 endif()
 
 if(LW_PPOCR_BUILD_OPENVINO_RUNTIME)

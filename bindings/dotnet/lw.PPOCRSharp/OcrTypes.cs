@@ -8,7 +8,8 @@ namespace Lw.PPOCRSharp
         OpenCvDnn = 1,
         DirectML = 2,
         OpenVINO = 3,
-        TensorRT = 4
+        TensorRT = 4,
+        OnnxRuntime = 5
     }
 
     public enum OcrPixelFormat

@@ -7,10 +7,12 @@ PACKAGE_DIR="$(cd -- "${PACKAGE_DIR}" && pwd)"
 cd "${PACKAGE_DIR}"
 sha256sum -c package-files.sha256
 
-for binary in \
-  liblw.PPOCR.so.1 \
-  runtimes/linux-x64/opencv/liblw.PPOCR.Runtime.OpenCVDNN.so \
-  lw-ppocr-http-service; do
+RUNTIME_LIBRARY="runtimes/linux-x64/opencv/liblw.PPOCR.Runtime.OpenCVDNN.so"
+if [[ -e runtimes/linux-x64/onnxruntime/liblw.PPOCR.Runtime.ONNXRuntime.so ]]; then
+  RUNTIME_LIBRARY="runtimes/linux-x64/onnxruntime/liblw.PPOCR.Runtime.ONNXRuntime.so"
+fi
+
+for binary in liblw.PPOCR.so.1 "${RUNTIME_LIBRARY}" lw-ppocr-http-service; do
   if ldd "${binary}" | grep -q "not found"; then
     echo "Missing shared-library dependency for ${binary}" >&2
     ldd "${binary}" >&2

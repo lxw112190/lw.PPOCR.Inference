@@ -23,7 +23,7 @@ from ppocr import OcrEngine
 
 # create
 engine = OcrEngine(
-    backend="directml",          # opencv | directml | openvino | tensorrt
+    backend="directml",          # opencv | directml | openvino | tensorrt | onnxruntime
     model_manifest="models/ppocrv6-tiny/model.json",
     device_id=0,
     enable_cls=True,

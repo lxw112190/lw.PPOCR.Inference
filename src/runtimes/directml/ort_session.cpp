@@ -1,6 +1,10 @@
 #include "ort_session.hpp"
 
+#if defined(LW_PPOCR_ORT_CUDA_RUNTIME)
+#include <onnxruntime_c_api.h>
+#else
 #include <dml_provider_factory.h>
+#endif
 
 #include <stdexcept>
 
@@ -18,17 +22,49 @@ OrtSession::OrtSession(
     Ort::Env& environment,
     const std::filesystem::path& model_path,
     int device_id,
-    bool use_gpu) {
+    bool& use_gpu,
+    bool allow_gpu_fallback) {
+#if defined(LW_PPOCR_ORT_CUDA_RUNTIME)
+    if (use_gpu) {
+        try {
+            Ort::SessionOptions gpu_options;
+            gpu_options.SetGraphOptimizationLevel(
+                GraphOptimizationLevel::ORT_ENABLE_ALL);
+            gpu_options.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
+            OrtCUDAProviderOptions cuda_options{};
+            cuda_options.device_id = device_id;
+            gpu_options.AppendExecutionProvider_CUDA(cuda_options);
+            session_ = Ort::Session(environment, model_path.c_str(), gpu_options);
+        } catch (const Ort::Exception&) {
+            if (!allow_gpu_fallback) {
+                throw;
+            }
+            use_gpu = false;
+            Ort::SessionOptions cpu_options;
+            cpu_options.SetGraphOptimizationLevel(
+                GraphOptimizationLevel::ORT_ENABLE_ALL);
+            cpu_options.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
+            session_ = Ort::Session(environment, model_path.c_str(), cpu_options);
+        }
+    } else {
+        Ort::SessionOptions cpu_options;
+        cpu_options.SetGraphOptimizationLevel(
+            GraphOptimizationLevel::ORT_ENABLE_ALL);
+        cpu_options.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
+        session_ = Ort::Session(environment, model_path.c_str(), cpu_options);
+    }
+#else
     Ort::SessionOptions options;
     options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
     options.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
     if (use_gpu) {
+        (void)allow_gpu_fallback;
         options.DisableMemPattern();
         Ort::ThrowOnError(
             OrtSessionOptionsAppendExecutionProvider_DML(options, device_id));
     }
-
     session_ = Ort::Session(environment, model_path.c_str(), options);
+#endif
     Ort::AllocatorWithDefaultOptions allocator;
     for (size_t index = 0; index < session_.GetInputCount(); ++index) {
         input_name_storage_.emplace_back(

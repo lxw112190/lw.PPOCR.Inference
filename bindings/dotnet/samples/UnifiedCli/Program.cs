@@ -97,15 +97,20 @@ static OcrOptions CreateOptions(
         DeviceId = deviceId,
         RuntimeRoot = runtimeRoot,
         ModelManifest = modelManifest,
-        BackendOptionsJson = backend == OcrBackend.OpenVINO
-            ? "{\"device\":\"CPU\"}"
-            : null,
+        BackendOptionsJson = backend switch
+        {
+            OcrBackend.OpenVINO => "{\"device\":\"CPU\"}",
+            OcrBackend.OnnxRuntime => "{\"device\":\"cpu\"}",
+            _ => null
+        },
         EnableClassifier = enableClassifier,
         RecognitionBatchSize = backend == OcrBackend.OpenVINO ? 1
-            : (backend == OcrBackend.DirectML || backend == OcrBackend.TensorRT ? 4 : 1),
+            : (backend == OcrBackend.DirectML || backend == OcrBackend.OnnxRuntime ||
+               backend == OcrBackend.TensorRT ? 4 : 1),
         RecognitionConcurrency = backend switch
         {
             OcrBackend.DirectML => 4,
+            OcrBackend.OnnxRuntime => 4,
             OcrBackend.OpenVINO => 8,
             OcrBackend.TensorRT => 4,
             _ => 2
@@ -121,7 +126,8 @@ static OcrBackend ParseBackend(string value)
         "directml" or "dml" => OcrBackend.DirectML,
         "openvino" => OcrBackend.OpenVINO,
         "tensorrt" or "trt" => OcrBackend.TensorRT,
-        _ => throw new ArgumentException("Backend must be opencv, directml, openvino, or tensorrt.")
+        "onnxruntime" or "ort" => OcrBackend.OnnxRuntime,
+        _ => throw new ArgumentException("Backend must be opencv, directml, openvino, tensorrt, or onnxruntime.")
     };
 }
 
@@ -207,7 +213,7 @@ static void PrintUsage()
     Console.WriteLine(
         "Usage: lw.PPOCR.Cli <backend> <model.json> <image> " +
         "[runtime-root] [device-id] [cls] [warmup] [runs]");
-    Console.WriteLine("Backends: opencv, directml, openvino, tensorrt");
+    Console.WriteLine("Backends: opencv, directml, openvino, tensorrt, onnxruntime");
 }
 
 internal sealed record DecodedImage(

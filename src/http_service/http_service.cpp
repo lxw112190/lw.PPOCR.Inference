@@ -187,8 +187,11 @@ lw_ppocr_backend ParseBackend(const std::string& value) {
     if (value == "tensorrt" || value == "trt") {
         return LW_PPOCR_BACKEND_TENSORRT;
     }
+    if (value == "onnxruntime" || value == "ort") {
+        return LW_PPOCR_BACKEND_ONNXRUNTIME;
+    }
     throw std::runtime_error(
-        "backend must be opencv, directml, openvino, or tensorrt");
+        "backend must be opencv, directml, openvino, tensorrt, or onnxruntime");
 }
 
 std::string LastError(lw_ppocr_handle handle) {

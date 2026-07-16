@@ -22,7 +22,7 @@ int32_t BytesPerPixel(lw_ppocr_pixel_format format) noexcept {
 
 bool IsKnownBackend(lw_ppocr_backend backend) noexcept {
     return backend >= LW_PPOCR_BACKEND_OPENCV_DNN &&
-        backend <= LW_PPOCR_BACKEND_TENSORRT;
+        backend <= LW_PPOCR_BACKEND_ONNXRUNTIME;
 }
 
 }  // namespace
@@ -109,6 +109,8 @@ const char* BackendDirectory(lw_ppocr_backend backend) noexcept {
         return "openvino";
     case LW_PPOCR_BACKEND_TENSORRT:
         return "tensorrt";
+    case LW_PPOCR_BACKEND_ONNXRUNTIME:
+        return "onnxruntime";
     default:
         return nullptr;
     }
@@ -135,6 +137,12 @@ const char* BackendLibraryName(lw_ppocr_backend backend) noexcept {
         return "lw.PPOCR.Runtime.TensorRT.dll";
 #else
         return "liblw.PPOCR.Runtime.TensorRT.so";
+#endif
+    case LW_PPOCR_BACKEND_ONNXRUNTIME:
+#if defined(_WIN32)
+        return "lw.PPOCR.Runtime.ONNXRuntime.dll";
+#else
+        return "liblw.PPOCR.Runtime.ONNXRuntime.so";
 #endif
     default:
         return nullptr;

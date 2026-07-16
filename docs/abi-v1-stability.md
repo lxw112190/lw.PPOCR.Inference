@@ -73,7 +73,7 @@ enum {
     LW_PPOCR_BACKEND_DIRECTML   = 2,
     LW_PPOCR_BACKEND_OPENVINO   = 3,
     LW_PPOCR_BACKEND_TENSORRT   = 4,
-    LW_PPOCR_BACKEND_NEW_ENGINE = 5,  // ← appended in v1.1.0
+    LW_PPOCR_BACKEND_ONNXRUNTIME = 5, // appended without renumbering v1 values
 };
 ```
 

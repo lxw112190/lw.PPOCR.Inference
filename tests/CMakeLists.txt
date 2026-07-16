@@ -45,6 +45,7 @@ endif()
 
 if(TARGET lw_ppocr_runtime_opencv_dnn OR
    TARGET lw_ppocr_runtime_directml OR
+   TARGET lw_ppocr_runtime_onnxruntime OR
    TARGET lw_ppocr_runtime_openvino OR
    TARGET lw_ppocr_runtime_tensorrt)
     add_executable(lw_ppocr_opencv_integration_test
@@ -86,6 +87,34 @@ if(TARGET lw_ppocr_runtime_opencv_dnn OR
             LABELS "integration;stability"
             TIMEOUT 300
         )
+    endif()
+
+    if(TARGET lw_ppocr_runtime_onnxruntime AND
+       LW_PPOCR_TEST_DET_MODEL AND LW_PPOCR_TEST_REC_MODEL AND
+       LW_PPOCR_TEST_DICTIONARY AND LW_PPOCR_TEST_IMAGE)
+        add_test(
+            NAME lw.ppocr.onnxruntime.integration
+            COMMAND lw_ppocr_opencv_integration_test
+                $<TARGET_FILE:lw_ppocr_runtime_onnxruntime>
+                "${LW_PPOCR_TEST_DET_MODEL}"
+                "${LW_PPOCR_TEST_REC_MODEL}"
+                "${LW_PPOCR_TEST_DICTIONARY}"
+                "${LW_PPOCR_TEST_IMAGE}"
+                onnxruntime
+                cpu
+                "${LW_PPOCR_TEST_CLS_MODEL}"
+        )
+        set_tests_properties(lw.ppocr.onnxruntime.integration PROPERTIES
+            ENVIRONMENT "LW_PPOCR_STRESS_ITERATIONS=100;LW_PPOCR_STRESS_THREADS=4;LW_PPOCR_STRESS_RUNS_PER_THREAD=10"
+            LABELS "integration;stability"
+            TIMEOUT 300
+        )
+        if(WIN32 AND TARGET opencv_world)
+            set_property(TEST lw.ppocr.onnxruntime.integration APPEND PROPERTY
+                ENVIRONMENT_MODIFICATION
+                    "PATH=path_list_prepend:$<TARGET_FILE_DIR:opencv_world>"
+            )
+        endif()
     endif()
 
     if(TARGET lw_ppocr_runtime_openvino AND

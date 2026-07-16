@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cctype>
 #include <cmath>
 #include <future>
 #include <mutex>
@@ -28,25 +29,67 @@ double Milliseconds(Clock::time_point start, Clock::time_point end) {
     return std::chrono::duration<double, std::milli>(end - start).count();
 }
 
-bool SelectUseGpu(const lw_ppocr_config& config) {
+struct ProviderSelection {
+    bool use_gpu;
+    bool allow_gpu_fallback;
+    const char* name;
+};
+
+ProviderSelection SelectProvider(const lw_ppocr_config& config) {
+#if defined(LW_PPOCR_ORT_CUDA_RUNTIME)
+    ProviderSelection selection{false, false, "CPU"};
+#else
+    ProviderSelection selection{true, false, "DirectML GPU"};
+#endif
     if (config.backend_options_json_utf8 == nullptr ||
         config.backend_options_json_utf8[0] == '\0') {
-        return true;
+        return selection;
     }
     cv::FileStorage storage(
         config.backend_options_json_utf8,
         cv::FileStorage::READ | cv::FileStorage::MEMORY |
             cv::FileStorage::FORMAT_JSON);
     if (!storage.isOpened()) {
-        throw std::invalid_argument("DirectML backend options JSON is malformed");
+        throw std::invalid_argument("ONNX Runtime backend options JSON is malformed");
     }
+#if defined(LW_PPOCR_ORT_CUDA_RUNTIME)
+    cv::FileNode device = storage["device"];
+    if (device.empty()) {
+        device = storage["provider"];
+    }
+    if (!device.empty()) {
+        std::string value;
+        device >> value;
+        std::transform(value.begin(), value.end(), value.begin(),
+            [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+        if (value == "cpu") {
+            return {false, false, "CPU"};
+        }
+        if (value == "cuda" || value == "gpu") {
+            return {true, false, "CUDA"};
+        }
+        if (value == "auto") {
+            return {true, true, "CUDA (automatic CPU fallback)"};
+        }
+        throw std::invalid_argument(
+            "ONNX Runtime device must be cpu, cuda, or auto");
+    }
+#endif
     const cv::FileNode value = storage["use_gpu"];
     if (value.empty()) {
-        return true;
+        return selection;
     }
     int use_gpu = 1;
     value >> use_gpu;
-    return use_gpu != 0;
+#if defined(LW_PPOCR_ORT_CUDA_RUNTIME)
+    return use_gpu != 0
+        ? ProviderSelection{true, false, "CUDA"}
+        : ProviderSelection{false, false, "CPU"};
+#else
+    return use_gpu != 0
+        ? ProviderSelection{true, false, "DirectML GPU"}
+        : ProviderSelection{false, false, "CPU"};
+#endif
 }
 
 int BucketWidth(int required, int minimum) {
@@ -62,13 +105,18 @@ int BucketWidth(int required, int minimum) {
 class Detector {
 public:
     Detector(Ort::Env& env, const core::ModelStage& model,
-        const lw_ppocr_config& config, bool use_gpu)
-        : session_(env, model.path, config.device_id, use_gpu),
+        const lw_ppocr_config& config, ProviderSelection& provider)
+        : session_(env, model.path, config.device_id, provider.use_gpu,
+              provider.allow_gpu_fallback),
           limit_side_len_(config.limit_side_len),
           threshold_(config.det_db_thresh),
           box_threshold_(config.det_db_box_thresh),
           unclip_ratio_(config.det_db_unclip_ratio),
-          use_dilation_(config.det_use_dilation != 0) {}
+          use_dilation_(config.det_use_dilation != 0) {
+        if (!provider.use_gpu && provider.allow_gpu_fallback) {
+            provider.name = "CPU (CUDA unavailable)";
+        }
+    }
 
     std::vector<core::OcrRegion> Run(
         const cv::Mat& image, core::StageTiming& timing) {
@@ -141,8 +189,9 @@ private:
 class Classifier {
 public:
     Classifier(Ort::Env& env, const core::ModelStage& model,
-        const lw_ppocr_config& config, bool use_gpu)
-        : session_(env, model.path, config.device_id, use_gpu),
+        const lw_ppocr_config& config, ProviderSelection& provider)
+        : session_(env, model.path, config.device_id, provider.use_gpu,
+              provider.allow_gpu_fallback),
           height_(model.input_shape[2]), width_(model.input_shape[3]),
           batch_size_(config.cls_batch_size), threshold_(config.cls_threshold) {}
 
@@ -208,14 +257,15 @@ class Recognizer {
 public:
     Recognizer(Ort::Env& env, const core::ModelStage& model,
         const std::filesystem::path& dictionary, const lw_ppocr_config& config,
-        bool use_gpu)
+        ProviderSelection& provider)
         : labels_(core::ReadDictionary(core::PathToUtf8(dictionary))),
           height_(model.input_shape[2]), minimum_width_(model.input_shape[3]),
           batch_size_(config.rec_batch_size) {
         sessions_.reserve(static_cast<size_t>(config.rec_concurrency));
         for (int index = 0; index < config.rec_concurrency; ++index) {
             sessions_.push_back(std::make_unique<OrtSession>(
-                env, model.path, config.device_id, use_gpu));
+                env, model.path, config.device_id, provider.use_gpu,
+                provider.allow_gpu_fallback));
         }
     }
 
@@ -340,19 +390,23 @@ struct DirectMlOcrEngine::Impl {
     explicit Impl(const lw_ppocr_config& config)
         : log_level(config.log_level), log_callback(config.log_callback),
           log_user_data(config.log_user_data), enable_classifier(config.enable_cls != 0),
-          use_gpu(SelectUseGpu(config)),
+          provider(SelectProvider(config)),
+#if defined(LW_PPOCR_ORT_CUDA_RUNTIME)
+          environment(ORT_LOGGING_LEVEL_FATAL, "lw_ppocr_onnxruntime"),
+#else
           environment(ORT_LOGGING_LEVEL_WARNING, "lw_ppocr_directml"),
+#endif
           manifest(core::LoadModelManifest(config.model_manifest_utf8)),
-          detector(environment, manifest.detector, config, use_gpu),
+          detector(environment, manifest.detector, config, provider),
           recognizer(environment, manifest.recognizer, manifest.dictionary, config,
-              use_gpu) {
+              provider) {
         if (enable_classifier) {
             if (!manifest.has_classifier) {
                 throw std::runtime_error(
                     "classifier is enabled but the model manifest has no classifier stage");
             }
             classifier = std::make_unique<Classifier>(
-                environment, manifest.classifier, config, use_gpu);
+                environment, manifest.classifier, config, provider);
         }
     }
 
@@ -360,7 +414,7 @@ struct DirectMlOcrEngine::Impl {
     lw_ppocr_log_callback log_callback;
     void* log_user_data;
     bool enable_classifier;
-    bool use_gpu;
+    ProviderSelection provider;
     Ort::Env environment;
     core::ModelManifest manifest;
     Detector detector;
@@ -371,9 +425,14 @@ struct DirectMlOcrEngine::Impl {
 
 DirectMlOcrEngine::DirectMlOcrEngine(const lw_ppocr_config& config)
     : impl_(std::make_unique<Impl>(config)) {
+#if defined(LW_PPOCR_ORT_CUDA_RUNTIME)
+    Log(LW_PPOCR_LOG_INFO, "ONNX Runtime loaded model package: " +
+        impl_->manifest.name + ", device: " + impl_->provider.name);
+#else
     Log(LW_PPOCR_LOG_INFO, "DirectML Runtime loaded model package: " +
         impl_->manifest.name + ", device: " +
-        (impl_->use_gpu ? "GPU" : "CPU"));
+        (impl_->provider.use_gpu ? "GPU" : "CPU"));
+#endif
 }
 
 DirectMlOcrEngine::~DirectMlOcrEngine() = default;
@@ -400,7 +459,11 @@ core::PipelineResult DirectMlOcrEngine::Run(const lw_ppocr_image& image) {
     impl_->recognizer.Run(crops, result.regions, result.recognizer);
     result.pipeline.total_ms = Milliseconds(pipeline_start, Clock::now());
     std::ostringstream message;
+#if defined(LW_PPOCR_ORT_CUDA_RUNTIME)
+    message << "ONNX Runtime timing: det=" << result.detector.total_ms
+#else
     message << "DirectML timing: det=" << result.detector.total_ms
+#endif
             << " ms, cls=" << result.classifier.total_ms
             << " ms, rec=" << result.recognizer.total_ms
             << " ms, total=" << result.pipeline.total_ms << " ms";

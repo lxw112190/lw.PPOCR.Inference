@@ -15,6 +15,13 @@
 #include <string>
 #include <vector>
 
+#ifndef LW_PPOCR_ORT_BACKEND_ID
+#define LW_PPOCR_ORT_BACKEND_ID LW_PPOCR_BACKEND_DIRECTML
+#define LW_PPOCR_ORT_LABEL "DirectML"
+#define LW_PPOCR_ORT_CAPABILITY_NAME "ONNX Runtime CPU / DirectML"
+#define LW_PPOCR_ORT_RUNTIME_API_NAME "lw.PPOCR ONNX Runtime DirectML Runtime"
+#endif
+
 namespace {
 
 using lw::ppocr::core::PipelineResult;
@@ -135,24 +142,24 @@ lw_ppocr_status Guard(Function&& function, const char* operation) {
 lw_ppocr_status LW_PPOCR_CALL Create(
     const lw_ppocr_config* config, void** runtime_handle) {
     if (!config || !runtime_handle) {
-        g_last_error = "DirectML create received invalid arguments";
+        g_last_error = LW_PPOCR_ORT_LABEL " create received invalid arguments";
         return LW_PPOCR_STATUS_INVALID_ARGUMENT;
     }
     *runtime_handle = nullptr;
-    if (config->backend != LW_PPOCR_BACKEND_DIRECTML) {
-        g_last_error = "DirectML Runtime received a different backend id";
+    if (config->backend != LW_PPOCR_ORT_BACKEND_ID) {
+        g_last_error = LW_PPOCR_ORT_LABEL " Runtime received a different backend id";
         return LW_PPOCR_STATUS_UNSUPPORTED;
     }
     return Guard([&] {
         auto engine = std::make_unique<DirectMlOcrEngine>(*config);
         *runtime_handle = engine.release();
-    }, "create DirectML engine");
+    }, "create " LW_PPOCR_ORT_LABEL " engine");
 }
 
 lw_ppocr_status LW_PPOCR_CALL Run(
     void* handle, const lw_ppocr_image* image, lw_ppocr_result** result) {
     if (!handle || !image || !result) {
-        g_last_error = "DirectML run received invalid arguments";
+        g_last_error = LW_PPOCR_ORT_LABEL " run received invalid arguments";
         return LW_PPOCR_STATUS_INVALID_ARGUMENT;
     }
     *result = nullptr;
@@ -161,13 +168,13 @@ lw_ppocr_status LW_PPOCR_CALL Run(
             static_cast<DirectMlOcrEngine*>(handle)->Run(*image));
         *result = &owned->value;
         owned.release();
-    }, "run DirectML inference");
+    }, "run " LW_PPOCR_ORT_LABEL " inference");
 }
 
 lw_ppocr_status LW_PPOCR_CALL RunJson(void* handle,
     const lw_ppocr_image* image, char** json_utf8, uint64_t* json_length) {
     if (!handle || !image || !json_utf8 || !json_length) {
-        g_last_error = "DirectML JSON run received invalid arguments";
+        g_last_error = LW_PPOCR_ORT_LABEL " JSON run received invalid arguments";
         return LW_PPOCR_STATUS_INVALID_ARGUMENT;
     }
     *json_utf8 = nullptr;
@@ -180,14 +187,14 @@ lw_ppocr_status LW_PPOCR_CALL RunJson(void* handle,
         std::memcpy(output, json.c_str(), json.size() + 1);
         *json_utf8 = output;
         *json_length = static_cast<uint64_t>(json.size());
-    }, "run DirectML JSON inference");
+    }, "run " LW_PPOCR_ORT_LABEL " JSON inference");
 }
 
 lw_ppocr_status LW_PPOCR_CALL RecognizeBatch(
     void* handle, const lw_ppocr_image* images, uint64_t image_count,
     lw_ppocr_recognition_result** result) {
     if (!handle || !images || image_count == 0 || !result) {
-        g_last_error = "DirectML recognition received invalid arguments";
+        g_last_error = LW_PPOCR_ORT_LABEL " recognition received invalid arguments";
         return LW_PPOCR_STATUS_INVALID_ARGUMENT;
     }
     *result = nullptr;
@@ -197,7 +204,7 @@ lw_ppocr_status LW_PPOCR_CALL RecognizeBatch(
                 images, image_count));
         *result = &owned->value;
         owned.release();
-    }, "run DirectML recognition-only inference");
+    }, "run " LW_PPOCR_ORT_LABEL " recognition-only inference");
 }
 
 void LW_PPOCR_CALL RecognitionResultFree(
@@ -218,15 +225,26 @@ lw_ppocr_status LW_PPOCR_CALL GetCapabilities(
     void* handle, lw_ppocr_capabilities* capabilities) {
     if (!handle || !capabilities ||
         capabilities->struct_size < LW_PPOCR_CAPABILITIES_V1_SIZE) {
-        g_last_error = "DirectML capabilities received invalid arguments";
+        g_last_error = LW_PPOCR_ORT_LABEL " capabilities received invalid arguments";
         return LW_PPOCR_STATUS_INVALID_ARGUMENT;
     }
     capabilities->api_version = LW_PPOCR_API_VERSION;
-    capabilities->backend = LW_PPOCR_BACKEND_DIRECTML;
-    capabilities->backend_name_utf8 = "ONNX Runtime CPU / DirectML";
+    capabilities->backend = LW_PPOCR_ORT_BACKEND_ID;
+    capabilities->backend_name_utf8 = LW_PPOCR_ORT_CAPABILITY_NAME;
     capabilities->supports_cpu = 1;
+#if defined(LW_PPOCR_ORT_CUDA_RUNTIME)
+    capabilities->supports_gpu = 0;
+    try {
+        const std::vector<std::string> providers = Ort::GetAvailableProviders();
+        capabilities->supports_gpu = std::find(providers.begin(), providers.end(),
+            "CUDAExecutionProvider") != providers.end() ? 1 : 0;
+    } catch (...) {
+    }
+    capabilities->supports_fp16 = capabilities->supports_gpu;
+#else
     capabilities->supports_gpu = 1;
     capabilities->supports_fp16 = 1;
+#endif
     capabilities->supports_int8 = 0;
     capabilities->supports_cls = 1;
     g_last_error.clear();
@@ -246,7 +264,7 @@ void LW_PPOCR_CALL Destroy(void** handle) {
 
 const lw_ppocr_runtime_api kRuntimeApi = {
     sizeof(lw_ppocr_runtime_api), LW_PPOCR_RUNTIME_API_VERSION,
-    "lw.PPOCR ONNX Runtime DirectML Runtime",
+    LW_PPOCR_ORT_RUNTIME_API_NAME,
     &Create, &Run, &RunJson, &ResultFree, &StringFree,
     &GetCapabilities, &GetLastError, &Destroy,
     static_cast<uint32_t>(sizeof(lw_ppocr_config)),

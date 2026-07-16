@@ -38,6 +38,22 @@
 
 ---
 
+## ONNX Runtime CPU / CUDA（Linux）
+
+| OS | 设备 | ONNX Runtime | CUDA | 验证版本 | 状态 |
+|---|---|---|---|---|---|
+| Windows 10 22H2 | CPU | 1.26.0 GPU 包的 CPU EP | 不使用 | v1.3.0-preview.1 | ✅ 本地源码回归 |
+| Ubuntu 20.04 x64 | CPU | 1.26.0 CPU 官方包 | 不使用 | v1.3.0-preview.1 | CI 待运行 |
+| Ubuntu 20.04 x64 | NVIDIA GPU | 1.26.0 GPU 官方包 | CUDA 12 / 13 对应包 | v1.3.0 | 实机待验证 |
+
+**约束：**
+
+- CPU 与 GPU 动态库必须来自同一 ONNX Runtime 版本；替换时复制完整 `libonnxruntime*.so*` 集合。
+- CUDA 12 与 CUDA 13 官方包不可混用；GPU 还要求兼容的 NVIDIA 驱动、CUDA、cuDNN 和 zlib。
+- `device=cpu` 强制 CPU，`device=cuda` 强制 CUDA，`device=auto` 允许 CUDA 初始化失败后回退 CPU。
+
+---
+
 ## OpenVINO
 
 | OS | CPU | OpenVINO | 验证版本 | 状态 |

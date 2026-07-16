@@ -1,0 +1,195 @@
+name: Linux ONNX Runtime
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ORT_VERSION: 1.26.0
+  PACKAGE_VERSION: 1.3.0-preview.1
+
+jobs:
+  ubuntu-20-04:
+    name: Ubuntu 20.04 x64 CPU build, test, package
+    runs-on: ubuntu-22.04
+    container: ubuntu:20.04
+
+    steps:
+      - name: Install build and runtime dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential ca-certificates curl git \
+            libjpeg-dev libpng-dev libtiff-dev pkg-config \
+            python3 python3-pip tar zlib1g-dev zstd
+          python3 -m pip install --no-cache-dir \
+            cmake==3.31.6 ninja==1.11.1.4 jsonschema==4.23.0
+
+      - uses: actions/checkout@v4
+
+      - name: Validate model manifests
+        run: python3 scripts/validate-model-schema.py
+
+      - name: Restore minimal OpenCV 5.0 cache
+        id: opencv-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .ci/opencv-5.0.0
+          key: opencv-5.0.0-ubuntu-20.04-x64-minimal-v1
+
+      - name: Build minimal OpenCV 5.0
+        if: steps.opencv-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p .ci /tmp/opencv-source /tmp/opencv-build
+          curl --fail --location --retry 5 --retry-delay 5 \
+            --retry-connrefused \
+            https://github.com/opencv/opencv/archive/refs/tags/5.0.0.tar.gz \
+            --output /tmp/opencv-5.0.0.tar.gz
+          tar -xzf /tmp/opencv-5.0.0.tar.gz \
+            --strip-components=1 -C /tmp/opencv-source
+          cmake -S /tmp/opencv-source -B /tmp/opencv-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/.ci/opencv-5.0.0" \
+            -DCMAKE_INSTALL_RPATH='$ORIGIN' \
+            -DBUILD_LIST=core,imgproc,imgcodecs,dnn \
+            -DBUILD_SHARED_LIBS=ON \
+            -DBUILD_EXAMPLES=OFF \
+            -DBUILD_JAVA=OFF \
+            -DBUILD_opencv_apps=OFF \
+            -DBUILD_PERF_TESTS=OFF \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_PROTOBUF=ON \
+            -DWITH_EIGEN=OFF \
+            -DWITH_FFMPEG=OFF \
+            -DWITH_GDAL=OFF \
+            -DWITH_GSTREAMER=OFF \
+            -DWITH_GTK=OFF \
+            -DWITH_IPP=OFF \
+            -DWITH_ITT=OFF \
+            -DWITH_JASPER=OFF \
+            -DWITH_LAPACK=OFF \
+            -DWITH_OPENCL=OFF \
+            -DWITH_OPENEXR=OFF \
+            -DWITH_QT=OFF \
+            -DWITH_TBB=OFF \
+            -DWITH_WEBP=OFF
+          cmake --build /tmp/opencv-build --parallel 2
+          cmake --install /tmp/opencv-build
+
+      - name: Save minimal OpenCV 5.0 cache
+        if: steps.opencv-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .ci/opencv-5.0.0
+          key: ${{ steps.opencv-cache.outputs.cache-primary-key }}
+
+      - name: Restore ONNX Runtime CPU cache
+        id: ort-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .ci/onnxruntime-linux-x64-${{ env.ORT_VERSION }}
+          key: onnxruntime-${{ env.ORT_VERSION }}-linux-x64-cpu-v1
+
+      - name: Download official ONNX Runtime CPU package
+        if: steps.ort-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p .ci /tmp/onnxruntime
+          curl --fail --location --retry 5 --retry-delay 5 \
+            --retry-connrefused \
+            "https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-linux-x64-${ORT_VERSION}.tgz" \
+            --output "/tmp/onnxruntime-${ORT_VERSION}.tgz"
+          tar -xzf "/tmp/onnxruntime-${ORT_VERSION}.tgz" \
+            --strip-components=1 -C /tmp/onnxruntime
+          mv /tmp/onnxruntime ".ci/onnxruntime-linux-x64-${ORT_VERSION}"
+
+      - name: Save ONNX Runtime CPU cache
+        if: steps.ort-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .ci/onnxruntime-linux-x64-${{ env.ORT_VERSION }}
+          key: ${{ steps.ort-cache.outputs.cache-primary-key }}
+
+      - name: Locate native packages
+        run: |
+          config="$(find "$GITHUB_WORKSPACE/.ci/opencv-5.0.0" \
+            -name OpenCVConfig.cmake -print -quit)"
+          test -n "$config"
+          echo "OpenCV_DIR=$(dirname "$config")" >> "$GITHUB_ENV"
+          echo "OpenCV_LIB=$GITHUB_WORKSPACE/.ci/opencv-5.0.0/lib" >> "$GITHUB_ENV"
+          echo "ORT_ROOT=$GITHUB_WORKSPACE/.ci/onnxruntime-linux-x64-${ORT_VERSION}" >> "$GITHUB_ENV"
+          test -e ".ci/onnxruntime-linux-x64-${ORT_VERSION}/lib/libonnxruntime.so"
+
+      - name: Configure ONNX Runtime CPU Runtime
+        run: |
+          cmake -S . -B build/ci-linux-onnxruntime -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DOpenCV_DIR="$OpenCV_DIR" \
+            -DLW_PPOCR_ONNXRUNTIME_ROOT="$ORT_ROOT" \
+            -DLW_PPOCR_BUILD_ONNXRUNTIME_RUNTIME=ON \
+            -DLW_PPOCR_BUILD_HTTP_SERVICE=ON \
+            -DLW_PPOCR_BUILD_TESTS=ON \
+            -DLW_PPOCR_BUILD_STUB_RUNTIME=ON \
+            -DLW_PPOCR_BUILD_OPENCV_RUNTIME=OFF \
+            -DLW_PPOCR_BUILD_DIRECTML_RUNTIME=OFF \
+            -DLW_PPOCR_BUILD_OPENVINO_RUNTIME=OFF \
+            -DLW_PPOCR_BUILD_TENSORRT_RUNTIME=OFF \
+            -DLW_PPOCR_TEST_DET_MODEL="$GITHUB_WORKSPACE/models/ppocrv6-tiny/det.onnx" \
+            -DLW_PPOCR_TEST_REC_MODEL="$GITHUB_WORKSPACE/models/ppocrv6-tiny/rec.onnx" \
+            -DLW_PPOCR_TEST_CLS_MODEL="$GITHUB_WORKSPACE/models/ppocrv6-tiny/cls.onnx" \
+            -DLW_PPOCR_TEST_DICTIONARY="$GITHUB_WORKSPACE/models/ppocrv6-tiny/ppocr_keys.txt" \
+            -DLW_PPOCR_TEST_IMAGE="$GITHUB_WORKSPACE/models/ppocrv6-tiny/sample.jpg"
+
+      - name: Build Release
+        run: cmake --build build/ci-linux-onnxruntime --parallel
+
+      - name: ABI and ONNX Runtime correctness tests
+        env:
+          LD_LIBRARY_PATH: ${{ github.workspace }}/build/ci-linux-onnxruntime/bin:${{ env.ORT_ROOT }}/lib:${{ env.OpenCV_LIB }}
+        run: ctest --test-dir build/ci-linux-onnxruntime --output-on-failure --verbose
+
+      - name: HTTP service host smoke test
+        env:
+          LD_LIBRARY_PATH: ${{ github.workspace }}/build/ci-linux-onnxruntime/bin:${{ env.ORT_ROOT }}/lib:${{ env.OpenCV_LIB }}
+        run: >-
+          python3 scripts/http-service-smoke.py
+          --binary-dir build/ci-linux-onnxruntime/bin
+
+      - name: Package Linux x64 ONNX Runtime CPU distribution
+        run: >-
+          bash scripts/package-linux-onnxruntime-x64.sh
+          build/ci-linux-onnxruntime
+          "dist/releases/v${PACKAGE_VERSION}"
+          "${PACKAGE_VERSION}"
+
+      - name: Verify packaged HTTP service
+        run: >-
+          python3 scripts/http-service-smoke.py
+          --package-dir
+          "dist/releases/v${PACKAGE_VERSION}/staging-linux-onnxruntime-x64/lw.PPOCR.Inference-v${PACKAGE_VERSION}-linux-x64-onnxruntime-cpu"
+
+      - name: Inspect ELF dependencies
+        run: |
+          PACKAGE="dist/releases/v${PACKAGE_VERSION}/staging-linux-onnxruntime-x64/lw.PPOCR.Inference-v${PACKAGE_VERSION}-linux-x64-onnxruntime-cpu"
+          ldd "$PACKAGE/liblw.PPOCR.so.1"
+          ldd "$PACKAGE/runtimes/linux-x64/onnxruntime/liblw.PPOCR.Runtime.ONNXRuntime.so"
+          ldd "$PACKAGE/lw-ppocr-http-service"
+
+      - name: Upload Linux ONNX Runtime CPU package
+        uses: actions/upload-artifact@v4
+        with:
+          name: lw.PPOCR.Inference-v${{ env.PACKAGE_VERSION }}-linux-x64-onnxruntime-cpu
+          path: |
+            dist/releases/v${{ env.PACKAGE_VERSION }}/lw.PPOCR.Inference-v${{ env.PACKAGE_VERSION }}-linux-x64-onnxruntime-cpu.tar.gz
+            dist/releases/v${{ env.PACKAGE_VERSION }}/lw.PPOCR.Inference-v${{ env.PACKAGE_VERSION }}-linux-x64-onnxruntime-cpu.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 14

@@ -32,10 +32,13 @@ _LW_PPOCR_BACKEND_OPENCV_DNN = 1
 _LW_PPOCR_BACKEND_DIRECTML   = 2
 _LW_PPOCR_BACKEND_OPENVINO   = 3
 _LW_PPOCR_BACKEND_TENSORRT   = 4
+_LW_PPOCR_BACKEND_ONNXRUNTIME = 5
 
 _BACKEND_MAP = {
     "opencv":   _LW_PPOCR_BACKEND_OPENCV_DNN,
     "directml": _LW_PPOCR_BACKEND_DIRECTML,
+    "onnxruntime": _LW_PPOCR_BACKEND_ONNXRUNTIME,
+    "ort": _LW_PPOCR_BACKEND_ONNXRUNTIME,
     "openvino": _LW_PPOCR_BACKEND_OPENVINO,
     "tensorrt": _LW_PPOCR_BACKEND_TENSORRT,
 }
@@ -224,7 +227,8 @@ class OcrEngine:
     Parameters
     ----------
     backend : str
-        One of ``"opencv"``, ``"directml"``, ``"openvino"``, ``"tensorrt"``.
+        One of ``"opencv"``, ``"directml"``, ``"openvino"``, ``"tensorrt"``,
+        or ``"onnxruntime"``.
     model_manifest : str
         Absolute or relative path to a ``model.json`` manifest.
     device_id : int

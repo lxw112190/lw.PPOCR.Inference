@@ -21,7 +21,8 @@ public:
     OrtSession(Ort::Env& environment,
         const std::filesystem::path& model_path,
         int device_id,
-        bool use_gpu);
+        bool& use_gpu,
+        bool allow_gpu_fallback = false);
 
     OrtOutput Run(
         float* input,
