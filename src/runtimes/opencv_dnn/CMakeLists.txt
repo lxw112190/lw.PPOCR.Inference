@@ -61,11 +61,16 @@ endif()
 if(NOT WIN32)
     foreach(LW_PPOCR_OPENCV_MODULE core imgproc imgcodecs dnn)
         if(TARGET opencv_${LW_PPOCR_OPENCV_MODULE})
-            install(FILES
-                $<TARGET_SONAME_FILE:opencv_${LW_PPOCR_OPENCV_MODULE}>
-                DESTINATION "${LW_PPOCR_OPENCV_INSTALL_DIR}"
-                FOLLOW_SYMLINK_CHAIN
-            )
+            # FOLLOW_SYMLINK_CHAIN belongs to file(INSTALL), not install(FILES).
+            # Start at the SONAME link so the package receives both the link and
+            # its versioned library while still honoring --prefix and DESTDIR.
+            install(CODE "
+                file(INSTALL
+                    \"$<TARGET_SONAME_FILE:opencv_${LW_PPOCR_OPENCV_MODULE}>\"
+                    DESTINATION \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${LW_PPOCR_OPENCV_INSTALL_DIR}\"
+                    FOLLOW_SYMLINK_CHAIN
+                )
+            ")
         endif()
     endforeach()
 endif()
