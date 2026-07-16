@@ -114,7 +114,12 @@ endif()
 if(LW_PPOCR_BUILD_OPENCV_RUNTIME OR LW_PPOCR_BUILD_DIRECTML_RUNTIME OR
    LW_PPOCR_BUILD_OPENVINO_RUNTIME OR LW_PPOCR_BUILD_TENSORRT_RUNTIME)
     if(LW_PPOCR_OPENCV_ROOT)
-        find_package(OpenCV CONFIG REQUIRED PATHS "${LW_PPOCR_OPENCV_ROOT}/build" NO_DEFAULT_PATH)
+        find_package(OpenCV CONFIG REQUIRED
+            PATHS
+                "${LW_PPOCR_OPENCV_ROOT}"
+                "${LW_PPOCR_OPENCV_ROOT}/build"
+            NO_DEFAULT_PATH
+        )
     else()
         find_package(OpenCV CONFIG REQUIRED)
     endif()

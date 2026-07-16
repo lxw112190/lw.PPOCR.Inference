@@ -60,53 +60,89 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/opencv
-          key: opencv-5.0.0-windows-x64-v2
+          key: opencv-5.0.0-windows-x64-v3
 
       - name: Download OpenCV
         if: steps.opencv-cache.outputs.cache-hit != 'true'
+        shell: pwsh
         run: |
-          # OpenCV 5.0.0 Windows binaries are on SourceForge, not GitHub Releases.
-          # The direct download link redirects to the best mirror.
-          $url = "https://sourceforge.net/projects/opencvlibrary/files/5.0.0/opencv-5.0.0-windows.exe/download"
-          $installer = "${{ runner.temp }}\opencv-installer.exe"
-          Write-Host "Downloading OpenCV 5.0.0 from SourceForge..."
-          Invoke-WebRequest -Uri $url -OutFile $installer -MaximumRetryCount 5 -RetryIntervalSec 15
+          $ErrorActionPreference = "Stop"
+          $url = "https://downloads.sourceforge.net/project/opencvlibrary/5.0.0/opencv-5.0.0-windows.exe"
+          $installer = Join-Path $env:RUNNER_TEMP "opencv-5.0.0-windows.exe"
+
+          Write-Host "Downloading OpenCV 5.0.0 from: $url"
+          curl.exe `
+            -L --fail --show-error `
+            --retry 5 --retry-delay 10 --retry-all-errors `
+            --output "$installer" `
+            "$url"
+          if ($LASTEXITCODE -ne 0) { throw "curl exit code: $LASTEXITCODE" }
+
+          if (-not (Test-Path $installer)) { throw "Installer not found" }
           $size = (Get-Item $installer).Length
-          Write-Host "Downloaded: $size bytes"
+          if ($size -lt 150MB) { throw "File too small ($size bytes), may be HTML page" }
+
+          # verify MZ header
+          $stream = [System.IO.File]::OpenRead($installer)
+          try { $b0 = $stream.ReadByte(); $b1 = $stream.ReadByte() }
+          finally { $stream.Dispose() }
+          if ($b0 -ne 0x4D -or $b1 -ne 0x5A) { throw "Not a valid executable" }
+          Write-Host "OpenCV download OK: $size bytes"
 
       - name: Extract OpenCV
         if: steps.opencv-cache.outputs.cache-hit != 'true'
+        shell: pwsh
         run: |
-          $installer = "${{ runner.temp }}\opencv-installer.exe"
-          $dest = "${{ runner.temp }}\opencv"
-          # The OpenCV installer is a 7-Zip self-extracting archive.
-          # Extract with 7z (pre-installed on GitHub Windows runners).
-          & "C:\Program Files\7-Zip\7z.exe" x $installer -o"$dest" -y
+          $ErrorActionPreference = "Stop"
+          $installer = Join-Path $env:RUNNER_TEMP "opencv-5.0.0-windows.exe"
+          $dest = Join-Path $env:RUNNER_TEMP "opencv"
+          if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+          New-Item -ItemType Directory -Path $dest -Force | Out-Null
+
+          $sevenZip = Get-Command "7z.exe" -ErrorAction Stop
+          Write-Host "7-Zip: $($sevenZip.Source)"
+          & $sevenZip.Source x "$installer" "-o$dest" -y
+          if ($LASTEXITCODE -ne 0) { throw "7z exit code: $LASTEXITCODE" }
           Write-Host "OpenCV extracted to $dest"
 
       - name: Set OpenCV paths
+        shell: pwsh
         run: |
-          # The extracted tree is: opencv/build/OpenCVConfig.cmake
-          # DLLs are at: opencv/build/x64/vc17/bin/opencv_world500.dll
-          $root = "${{ runner.temp }}\opencv\opencv\build"
-          if (-not (Test-Path "$root\OpenCVConfig.cmake")) {
-            Write-Host "Expected path not found, searching..."
-            $found = Get-ChildItem -Path "${{ runner.temp }}\opencv" -Filter "OpenCVConfig.cmake" -Recurse -Depth 4 |
-              Select-Object -First 1
-            if (-not $found) { throw "OpenCVConfig.cmake not found in extracted tree" }
-            $root = Split-Path -Parent $found.FullName
-          }
-          $dll = Get-ChildItem -Path "$root" -Filter "opencv_world*.dll" -Recurse -Depth 3 |
+          $ErrorActionPreference = "Stop"
+          $extractRoot = Join-Path $env:RUNNER_TEMP "opencv"
+
+          $config = Get-ChildItem -Path $extractRoot `
+            -Filter "OpenCVConfig.cmake" -File -Recurse |
             Select-Object -First 1
-          $bindir = if ($dll) { Split-Path -Parent $dll.FullName } else { "$root\x64\vc17\bin" }
-          echo "OpenCV_ROOT=$root" >> $env:GITHUB_ENV
-          echo "OpenCV_BIN=$bindir" >> $env:GITHUB_ENV
-          Write-Host "OpenCV_ROOT=$root"
-          Write-Host "OpenCV_BIN=$bindir"
+          if (-not $config) {
+            Write-Host "Extracted tree:"
+            Get-ChildItem -Path $extractRoot -Recurse -Depth 3 |
+              ForEach-Object { Write-Host $_.FullName }
+            throw "OpenCVConfig.cmake not found"
+          }
+
+          # OpenCVConfig.cmake lives at <root>/build/OpenCVConfig.cmake
+          $opencvBuild = Split-Path -Parent $config.FullName
+          $opencvRoot  = Split-Path -Parent $opencvBuild
+
+          $opencvDll = Get-ChildItem -Path $opencvBuild `
+            -Filter "opencv_world*.dll" -File -Recurse |
+            Where-Object { $_.FullName -notmatch "\\debug\\" } |
+            Select-Object -First 1
+          if (-not $opencvDll) { throw "opencv_world DLL not found" }
+          $opencvBin = Split-Path -Parent $opencvDll.FullName
+
+          "OpenCV_ROOT=$opencvRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "OpenCV_BIN=$opencvBin"   | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "OpenCV_ROOT=$opencvRoot"
+          Write-Host "OpenCV_BIN=$opencvBin"
 
       - name: Configure with OpenCV Runtime
+        shell: pwsh
         run: |
-          cmake -S . -B build/ci-opencv -G "Visual Studio 17 2022" -A x64 `
+          $ErrorActionPreference = "Stop"
+          cmake -S . -B build/ci-opencv `
+            -G "Visual Studio 17 2022" -A x64 `
             -DLW_PPOCR_BUILD_OPENCV_RUNTIME=ON `
             -DLW_PPOCR_OPENCV_ROOT="$env:OpenCV_ROOT" `
             -DLW_PPOCR_BUILD_DIRECTML_RUNTIME=OFF `
@@ -119,21 +155,29 @@ jobs:
             -DLW_PPOCR_TEST_CLS_MODEL="${{ github.workspace }}/models/ppocrv6-tiny/cls.onnx" `
             -DLW_PPOCR_TEST_DICTIONARY="${{ github.workspace }}/models/ppocrv6-tiny/ppocr_keys.txt" `
             -DLW_PPOCR_TEST_IMAGE="${{ github.workspace }}/models/ppocrv6-tiny/sample.jpg"
+          if ($LASTEXITCODE -ne 0) { throw "CMake configure exit code: $LASTEXITCODE" }
 
       - name: Build Release
-        run: cmake --build build/ci-opencv --config Release
+        shell: pwsh
+        run: |
+          cmake --build build/ci-opencv --config Release --parallel
+          if ($LASTEXITCODE -ne 0) { throw "Build exit code: $LASTEXITCODE" }
 
       - name: OpenCV integration test
+        shell: pwsh
         run: |
           $env:PATH = "${{ github.workspace }}\build\ci-opencv\bin\Release;$env:OpenCV_BIN;$env:PATH"
           ctest --test-dir build/ci-opencv -C Release `
-            -R lw.ppocr.opencv.integration --output-on-failure
+            -R "^lw\.ppocr\.opencv\.integration$" --output-on-failure --verbose
+          if ($LASTEXITCODE -ne 0) { throw "Integration test exit code: $LASTEXITCODE" }
 
       - name: Golden correctness test
+        shell: pwsh
         run: |
           $env:PATH = "${{ github.workspace }}\build\ci-opencv\bin\Release;$env:OpenCV_BIN;$env:PATH"
           ctest --test-dir build/ci-opencv -C Release `
-            -R lw.ppocr.golden --output-on-failure
+            -R "^lw\.ppocr\.golden$" --output-on-failure --verbose
+          if ($LASTEXITCODE -ne 0) { throw "Golden test exit code: $LASTEXITCODE" }
 
   # ------------------------------------------------------------------
   # C example compilation test
