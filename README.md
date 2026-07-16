@@ -156,6 +156,31 @@ curl -X POST http://127.0.0.1:8787/api/ocr \
 
 Windows 使用 `run-http-service.cmd` 前台启动，或以管理员身份运行 `install-service.cmd` 安装为 Windows Service。Linux 使用 `./run-http-service.sh` 前台启动，或运行 `sudo ./install-systemd.sh` 安装到 `/opt/lw-ppocr` 并注册为 systemd 服务。更完整的配置、响应字段和部署说明见 [HTTP API、Windows Service 与 Linux systemd](docs/http-service.md)。
 
+### Linux OpenCV DNN HTTP 服务快速部署
+
+GitHub Actions 下载的 Artifact ZIP 内含正式的 `.tar.gz` 和 `.sha256`。将这两个文件传到 Ubuntu 20.04 x86_64 后执行：
+
+```bash
+sha256sum -c lw.PPOCR.Inference-v1.2.0-linux-x64-opencv.tar.gz.sha256
+tar -xzf lw.PPOCR.Inference-v1.2.0-linux-x64-opencv.tar.gz
+cd lw.PPOCR.Inference-v1.2.0-linux-x64-opencv
+sudo ./install-deps-ubuntu.sh
+./verify-linux-package.sh
+./run-http-service.sh
+```
+
+浏览器访问 `http://127.0.0.1:8787/`。验证脚本会检查包内校验、ELF 依赖、健康接口并执行一次真实 OCR；运行它之前不要启动另一个占用 8787 端口的服务。
+
+正式部署前编辑 `http-service.json`。局域网访问应把 `listen_host` 改为 `0.0.0.0`、设置非空 `api_key` 并限制防火墙来源；客户端通过 `X-API-Key` 请求头传递密钥。配置完成后安装 systemd：
+
+```bash
+sudo ./install-systemd.sh
+systemctl status lw-ppocr-http.service
+journalctl -u lw-ppocr-http.service -f
+```
+
+完整的 API 调用、配置字段、服务管理与排错步骤见 [Linux OpenCV DNN 详细部署文档](docs/linux-opencv.md)。
+
 ## 命令行示例
 
 ```powershell

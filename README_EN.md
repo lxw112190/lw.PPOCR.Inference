@@ -162,6 +162,31 @@ The default listener is `127.0.0.1`. For LAN access, change `listen_host` to `0.
 
 On Windows, use `run-http-service.cmd` for foreground execution or run `install-service.cmd` as administrator to install a Windows Service. On Linux, use `./run-http-service.sh` in the foreground or `sudo ./install-systemd.sh` to install under `/opt/lw-ppocr` as a systemd service. See [HTTP API, Windows Service, and Linux systemd](docs/http-service.md) for response fields and detailed deployment instructions.
 
+### Linux OpenCV DNN HTTP Service Quick Start
+
+The GitHub Actions Artifact ZIP contains the release `.tar.gz` and its `.sha256` file. Copy those two files to Ubuntu 20.04 x86_64 and run:
+
+```bash
+sha256sum -c lw.PPOCR.Inference-v1.2.0-linux-x64-opencv.tar.gz.sha256
+tar -xzf lw.PPOCR.Inference-v1.2.0-linux-x64-opencv.tar.gz
+cd lw.PPOCR.Inference-v1.2.0-linux-x64-opencv
+sudo ./install-deps-ubuntu.sh
+./verify-linux-package.sh
+./run-http-service.sh
+```
+
+Open `http://127.0.0.1:8787/`. The verification script checks packaged hashes and ELF dependencies, probes the health endpoint, and runs a real OCR request. Do not run another service on port 8787 during verification.
+
+Before a permanent deployment, edit `http-service.json`. For LAN access, set `listen_host` to `0.0.0.0`, configure a non-empty `api_key`, restrict the firewall to trusted clients, and send the secret through the `X-API-Key` request header. Then install the systemd service:
+
+```bash
+sudo ./install-systemd.sh
+systemctl status lw-ppocr-http.service
+journalctl -u lw-ppocr-http.service -f
+```
+
+See the [complete Linux OpenCV DNN deployment guide](docs/linux-opencv.md) for API examples, configuration fields, service management, and troubleshooting.
+
 ## CLI Examples
 
 ```powershell

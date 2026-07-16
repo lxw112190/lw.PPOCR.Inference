@@ -115,13 +115,34 @@ lw.PPOCR.HttpService.exe --uninstall --config http-service.json
 
 ## Linux systemd
 
-Ubuntu 20.04 OpenCV DNN 包提供：
+Ubuntu 20.04 OpenCV DNN 包已经包含 HTTP 主程序、网页、模型、OpenCV 共享库和服务脚本。首次部署顺序如下：
 
 ```bash
 sudo ./install-deps-ubuntu.sh
+./verify-linux-package.sh
+./run-http-service.sh
+```
+
+确认前台运行正常后按 `Ctrl+C` 停止，编辑当前目录的 `http-service.json`，再安装 systemd：
+
+```bash
 sudo ./install-systemd.sh
 systemctl status lw-ppocr-http.service
 journalctl -u lw-ppocr-http.service -f
 ```
 
-安装目录固定为 `/opt/lw-ppocr`。`uninstall-systemd.sh` 只移除 systemd 单元，保留模型和配置。完整说明见 [Linux OpenCV DNN 部署](linux-opencv.md)。
+安装脚本把完整目录复制到 `/opt/lw-ppocr`，服务配置位于 `/opt/lw-ppocr/http-service.json`。修改后需要重启：
+
+```bash
+sudo nano /opt/lw-ppocr/http-service.json
+sudo systemctl restart lw-ppocr-http.service
+curl http://127.0.0.1:8787/health
+```
+
+`uninstall-systemd.sh` 只移除 systemd 单元，保留模型、程序和配置：
+
+```bash
+sudo /opt/lw-ppocr/uninstall-systemd.sh
+```
+
+验证脚本会临时使用 8787 端口，因此应在安装或启动 systemd 之前运行。如果服务无法启动，先查看 `journalctl -u lw-ppocr-http.service -n 100 --no-pager`，再使用 `ldd` 检查包内主程序和 Runtime 是否存在 `not found`。完整的 Artifact 解包、API 调用、局域网配置、防火墙和排错说明见 [Linux OpenCV DNN 部署](linux-opencv.md)。

@@ -12,13 +12,15 @@
     h1 { margin: 0 0 6px; font-size: 28px; }
     .sub { margin: 0; color: #8fa2c7; }
     .card { margin-top: 18px; padding: 18px; border: 1px solid #293755; border-radius: 14px; background: #121a2d; box-shadow: 0 12px 34px #03071255; }
-    .toolbar { display: grid; grid-template-columns: minmax(260px,1fr) 190px 220px auto; gap: 12px; align-items: end; }
-    label { display: grid; gap: 7px; color: #9badcf; font-size: 13px; }
+    .toolbar { display: grid; grid-template-columns: minmax(300px,1.2fr) minmax(170px,.65fr) minmax(320px,1.35fr) 150px; gap: 16px; align-items: start; }
+    label { display: grid; min-width: 0; gap: 8px; color: #9badcf; font-size: 13px; }
     .hint { color: #7084aa; font-size: 12px; line-height: 1.45; }
     input, select, button { min-height: 42px; border: 1px solid #344563; border-radius: 8px; font: inherit; }
-    input, select { padding: 8px 10px; color: #e8eefc; background: #0b1222; }
+    input, select { width: 100%; min-width: 0; padding: 8px 10px; color: #e8eefc; background: #0b1222; }
+    input[type="file"] { padding: 6px 8px; }
     button { padding: 8px 20px; color: white; background: #2878ff; cursor: pointer; font-weight: 650; border-color: #438aff; }
     button:disabled { opacity: .55; cursor: wait; }
+    .toolbar > button { width: 100%; margin-top: 25px; }
     #status { min-height: 24px; margin: 14px 0 0; color: #78b7ff; }
     .stage { display: none; margin-top: 16px; overflow: auto; padding: 10px; border-radius: 10px; background: #070b14; text-align: center; }
     canvas { display: block; max-width: 100%; height: auto; margin: auto; border-radius: 6px; }
@@ -31,8 +33,13 @@
     th { color: #8fa2c7; font-size: 12px; }
     td:first-child { width: 48px; color: #7fb8ff; }
     pre { overflow: auto; max-height: 330px; padding: 12px; background: #090f1e; border-radius: 8px; color: #cbd8ef; }
-    @media (max-width: 900px) { .toolbar { grid-template-columns: 1fr 1fr; } .timings { grid-template-columns: repeat(3,1fr); } }
-    @media (max-width: 560px) { .toolbar { grid-template-columns: 1fr; } .timings { grid-template-columns: repeat(2,1fr); } }
+    @media (max-width: 980px) {
+      .toolbar { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+      .toolbar .api-key, .toolbar > button { grid-column: 1 / -1; }
+      .toolbar > button { margin-top: 0; }
+      .timings { grid-template-columns: repeat(3,1fr); }
+    }
+    @media (max-width: 560px) { .toolbar { grid-template-columns: 1fr; } .toolbar .api-key, .toolbar > button { grid-column: auto; } .timings { grid-template-columns: repeat(2,1fr); } }
   </style>
 </head>
 <body>
@@ -43,7 +50,7 @@
     <div class="toolbar">
       <label>图片（JPEG / PNG / BMP / GIF / TIFF）<input id="file" type="file" accept="image/*"></label>
       <label>处理方式<select id="mode"><option value="ocr">完整 OCR</option><option value="recognize">仅文字识别</option></select></label>
-      <label>API Key（未配置可留空）
+      <label class="api-key">API Key（未配置可留空）
         <input id="key" type="password" autocomplete="off" placeholder="对应 http-service.json 中的 api_key">
         <small class="hint">服务配置了 api_key 时必填；网页会通过 X-API-Key 请求头发送，不会写入 URL。</small>
       </label>
