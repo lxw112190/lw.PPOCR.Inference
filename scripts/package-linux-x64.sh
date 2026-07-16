@@ -55,6 +55,19 @@ if ! compgen -G "${PACKAGE_DIR}/runtimes/linux-x64/opencv/libopencv_*.so.500" \
   exit 1
 fi
 
+# Fail before archiving if an OpenCV module or another ELF dependency was not
+# copied into the self-contained package.
+for binary in \
+  "${PACKAGE_DIR}/liblw.PPOCR.so.1" \
+  "${PACKAGE_DIR}/runtimes/linux-x64/opencv/liblw.PPOCR.Runtime.OpenCVDNN.so" \
+  "${PACKAGE_DIR}/lw-ppocr-http-service"; do
+  if missing_dependencies="$(ldd "${binary}" | grep 'not found')"; then
+    echo "Missing shared-library dependency for ${binary}:" >&2
+    echo "${missing_dependencies}" >&2
+    exit 1
+  fi
+done
+
 (
   cd "${PACKAGE_DIR}"
   find . -type f ! -name package-files.sha256 -print0 \

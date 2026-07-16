@@ -59,14 +59,24 @@ if(TARGET opencv_world)
 endif()
 
 if(NOT WIN32)
-    foreach(LW_PPOCR_OPENCV_MODULE core imgproc imgcodecs dnn)
-        if(TARGET opencv_${LW_PPOCR_OPENCV_MODULE})
+    set(LW_PPOCR_OPENCV_RUNTIME_TARGETS ${OpenCV_LIBS})
+    list(REMOVE_DUPLICATES LW_PPOCR_OPENCV_RUNTIME_TARGETS)
+    foreach(LW_PPOCR_OPENCV_TARGET IN LISTS LW_PPOCR_OPENCV_RUNTIME_TARGETS)
+        if(TARGET ${LW_PPOCR_OPENCV_TARGET})
+            get_target_property(LW_PPOCR_OPENCV_TARGET_TYPE
+                ${LW_PPOCR_OPENCV_TARGET} TYPE
+            )
+        else()
+            set(LW_PPOCR_OPENCV_TARGET_TYPE "")
+        endif()
+        if(LW_PPOCR_OPENCV_TARGET_TYPE STREQUAL "SHARED_LIBRARY")
             # FOLLOW_SYMLINK_CHAIN belongs to file(INSTALL), not install(FILES).
-            # Start at the SONAME link so the package receives both the link and
-            # its versioned library while still honoring --prefix and DESTDIR.
+            # OpenCV 5 components can introduce additional shared modules such
+            # as geometry and flann, so install every shared target reported by
+            # OpenCV_LIBS instead of maintaining a fixed module list.
             install(CODE "
                 file(INSTALL
-                    \"$<TARGET_SONAME_FILE:opencv_${LW_PPOCR_OPENCV_MODULE}>\"
+                    \"$<TARGET_SONAME_FILE:${LW_PPOCR_OPENCV_TARGET}>\"
                     DESTINATION \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${LW_PPOCR_OPENCV_INSTALL_DIR}\"
                     FOLLOW_SYMLINK_CHAIN
                 )
