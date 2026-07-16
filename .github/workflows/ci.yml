@@ -186,6 +186,19 @@ jobs:
             -R "^lw\.ppocr\.golden$" --output-on-failure --verbose
           if ($LASTEXITCODE -ne 0) { throw "Golden test exit code: $LASTEXITCODE" }
 
+      - name: Upload built binaries
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lw.PPOCR.Inference-OpenCV-win-x64
+          path: |
+            build/ci-opencv/bin/Release/lw.PPOCR.dll
+            build/ci-opencv/bin/Release/lw.PPOCR.lib
+            build/ci-opencv/bin/Release/lw.PPOCR.Runtime.OpenCVDNN.dll
+            build/ci-opencv/bin/Release/lw.PPOCR.Runtime.Stub.dll
+            build/ci-opencv/include/
+          retention-days: 7
+
   # ------------------------------------------------------------------
   # C example compilation test
   # ------------------------------------------------------------------
