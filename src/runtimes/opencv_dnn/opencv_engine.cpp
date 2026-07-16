@@ -5,6 +5,7 @@
 #include <lw/ppocr/core/model_manifest.hpp>
 
 #include <opencv2/dnn.hpp>
+#include <opencv2/core/version.hpp>
 #include <opencv2/imgproc.hpp>
 
 #include <algorithm>
@@ -26,11 +27,19 @@ double Milliseconds(Clock::time_point start, Clock::time_point end) {
     return std::chrono::duration<double, std::milli>(end - start).count();
 }
 
+void ConfigureCpuBackend(cv::dnn::Net& net) {
+    net.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
+#if CV_VERSION_MAJOR < 5
+    // OpenCV 5's new graph engine currently runs on CPU by default and emits
+    // a warning when a target is selected explicitly.
+    net.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
+#endif
+}
+
 cv::dnn::Net LoadOnnxNet(const std::filesystem::path& path) {
     const std::vector<unsigned char> bytes = core::ReadBinaryFile(path);
     cv::dnn::Net net = cv::dnn::readNetFromONNX(bytes);
-    net.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
-    net.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
+    ConfigureCpuBackend(net);
     return net;
 }
 
@@ -227,8 +236,7 @@ public:
         nets_.reserve(static_cast<size_t>(concurrency_));
         for (int index = 0; index < concurrency_; ++index) {
             cv::dnn::Net net = cv::dnn::readNetFromONNX(bytes);
-            net.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
-            net.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
+            ConfigureCpuBackend(net);
             nets_.push_back(std::move(net));
         }
     }

@@ -226,6 +226,10 @@ def main() -> int:
                     raise RuntimeError(
                         "HTTP startup output leaked the configured API Key"
                     )
+                if "Targets are not supported by the new graph engine" in service_output:
+                    raise RuntimeError(
+                        "OpenCV DNN emitted an unsupported target warning"
+                    )
     return 0
 
 
