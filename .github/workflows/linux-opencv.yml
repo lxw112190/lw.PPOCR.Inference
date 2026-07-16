@@ -47,7 +47,8 @@ jobs:
         if: steps.opencv-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p .ci /tmp/opencv-source /tmp/opencv-build
-          curl --fail --location --retry 5 --retry-all-errors \
+          curl --fail --location --retry 5 --retry-delay 5 \
+            --retry-connrefused \
             https://github.com/opencv/opencv/archive/refs/tags/5.0.0.tar.gz \
             --output /tmp/opencv-5.0.0.tar.gz
           tar -xzf /tmp/opencv-5.0.0.tar.gz \
