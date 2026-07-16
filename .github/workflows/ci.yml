@@ -160,8 +160,15 @@ jobs:
       - name: Build Release
         shell: pwsh
         run: |
-          cmake --build build/ci-opencv --config Release --parallel
-          if ($LASTEXITCODE -ne 0) { throw "Build exit code: $LASTEXITCODE" }
+          $ErrorActionPreference = "Stop"
+          cmake --build build/ci-opencv --config Release --parallel `
+            -- /verbosity:normal 2>&1 |
+            Tee-Object -FilePath build-release.log
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "========== Build log =========="
+            Get-Content build-release.log
+            throw "Build exit code: $LASTEXITCODE"
+          }
 
       - name: OpenCV integration test
         shell: pwsh

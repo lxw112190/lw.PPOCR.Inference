@@ -1,7 +1,6 @@
 #include <lw/ppocr/core/db_postprocessor.hpp>
 
 #include <clipper.h>
-#include <opencv2/geometry.hpp>
 #include <opencv2/imgproc.hpp>
 
 #include <algorithm>
