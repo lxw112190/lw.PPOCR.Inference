@@ -4,10 +4,13 @@ add_executable(lw_ppocr_abi_smoke_test
 add_executable(lw_ppocr_abi_stability_test
     abi_stability_test.cpp
 )
+find_package(Threads REQUIRED)
 target_include_directories(lw_ppocr_abi_smoke_test PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_include_directories(lw_ppocr_abi_stability_test PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(lw_ppocr_abi_smoke_test PRIVATE lw_ppocr_loader)
-target_link_libraries(lw_ppocr_abi_stability_test PRIVATE lw_ppocr_loader)
+target_link_libraries(lw_ppocr_abi_stability_test
+    PRIVATE lw_ppocr_loader Threads::Threads
+)
 
 if(WIN32)
     target_link_libraries(lw_ppocr_abi_stability_test PRIVATE Psapi)
@@ -51,7 +54,7 @@ if(TARGET lw_ppocr_runtime_opencv_dnn OR
         PRIVATE ${CMAKE_SOURCE_DIR}/include ${OpenCV_INCLUDE_DIRS}
     )
     target_link_libraries(lw_ppocr_opencv_integration_test
-        PRIVATE lw_ppocr_loader ${OpenCV_LIBS}
+        PRIVATE lw_ppocr_loader ${OpenCV_LIBS} Threads::Threads
     )
     if(WIN32)
         target_link_libraries(lw_ppocr_opencv_integration_test PRIVATE Psapi)

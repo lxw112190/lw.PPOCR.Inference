@@ -397,6 +397,7 @@ void SetJson(httplib::Response& response, const json& value, int status = 200) {
     response.set_content(value.dump(), "application/json; charset=utf-8");
 }
 
+#if defined(_WIN32)
 void AppendServiceLog(const std::string& message) {
     try {
         std::ofstream output(g_config_path.parent_path() / "http-service.log",
@@ -414,6 +415,7 @@ void AppendServiceLog(const std::string& message) {
     } catch (...) {
     }
 }
+#endif
 
 bool ConstantTimeEquals(const std::string& left, const std::string& right) {
     size_t difference = left.size() ^ right.size();
