@@ -60,31 +60,49 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/opencv
-          key: opencv-5.0.0-windows-x64
+          key: opencv-5.0.0-windows-x64-v2
 
-      - name: Download and extract OpenCV
+      - name: Download OpenCV
         if: steps.opencv-cache.outputs.cache-hit != 'true'
         run: |
-          $url = "https://github.com/opencv/opencv/releases/download/5.0.0/opencv-5.0.0-windows.exe"
+          # OpenCV 5.0.0 Windows binaries are on SourceForge, not GitHub Releases.
+          # The direct download link redirects to the best mirror.
+          $url = "https://sourceforge.net/projects/opencvlibrary/files/5.0.0/opencv-5.0.0-windows.exe/download"
           $installer = "${{ runner.temp }}\opencv-installer.exe"
-          Write-Host "Downloading OpenCV 5.0.0..."
-          Invoke-WebRequest -Uri $url -OutFile $installer -MaximumRetryCount 3 -RetryIntervalSec 10
-          Write-Host "Extracting..."
-          Start-Process -FilePath $installer -ArgumentList @("-o${{ runner.temp }}\opencv", "-y") -Wait -NoNewWindow
-          Write-Host "OpenCV extracted to ${{ runner.temp }}\opencv"
+          Write-Host "Downloading OpenCV 5.0.0 from SourceForge..."
+          Invoke-WebRequest -Uri $url -OutFile $installer -MaximumRetryCount 5 -RetryIntervalSec 15
+          $size = (Get-Item $installer).Length
+          Write-Host "Downloaded: $size bytes"
+
+      - name: Extract OpenCV
+        if: steps.opencv-cache.outputs.cache-hit != 'true'
+        run: |
+          $installer = "${{ runner.temp }}\opencv-installer.exe"
+          $dest = "${{ runner.temp }}\opencv"
+          # The OpenCV installer is a 7-Zip self-extracting archive.
+          # Extract with 7z (pre-installed on GitHub Windows runners).
+          & "C:\Program Files\7-Zip\7z.exe" x $installer -o"$dest" -y
+          Write-Host "OpenCV extracted to $dest"
 
       - name: Set OpenCV paths
         run: |
+          # The extracted tree is: opencv/build/OpenCVConfig.cmake
+          # DLLs are at: opencv/build/x64/vc17/bin/opencv_world500.dll
           $root = "${{ runner.temp }}\opencv\opencv\build"
           if (-not (Test-Path "$root\OpenCVConfig.cmake")) {
-            # fallback: search one level deeper
-            $found = Get-ChildItem -Path "${{ runner.temp }}\opencv" -Filter "OpenCVConfig.cmake" -Recurse -Depth 3 |
+            Write-Host "Expected path not found, searching..."
+            $found = Get-ChildItem -Path "${{ runner.temp }}\opencv" -Filter "OpenCVConfig.cmake" -Recurse -Depth 4 |
               Select-Object -First 1
-            if ($found) { $root = Split-Path -Parent $found.FullName }
+            if (-not $found) { throw "OpenCVConfig.cmake not found in extracted tree" }
+            $root = Split-Path -Parent $found.FullName
           }
+          $dll = Get-ChildItem -Path "$root" -Filter "opencv_world*.dll" -Recurse -Depth 3 |
+            Select-Object -First 1
+          $bindir = if ($dll) { Split-Path -Parent $dll.FullName } else { "$root\x64\vc17\bin" }
           echo "OpenCV_ROOT=$root" >> $env:GITHUB_ENV
-          echo "OpenCV_BIN=$root\x64\vc17\bin" >> $env:GITHUB_ENV
+          echo "OpenCV_BIN=$bindir" >> $env:GITHUB_ENV
           Write-Host "OpenCV_ROOT=$root"
+          Write-Host "OpenCV_BIN=$bindir"
 
       - name: Configure with OpenCV Runtime
         run: |
