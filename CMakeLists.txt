@@ -107,6 +107,7 @@ install(FILES
     docs/performance-report.md
     docs/releases/v1.0.0.md
     docs/releases/v1.1.0.md
+    docs/releases/v1.3.0.md
     docs/releases/v0.9.0-rc.1.md
     docs/releases/v0.8.0.md
     docs/releases/v0.3.0.md

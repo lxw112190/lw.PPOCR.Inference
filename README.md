@@ -6,7 +6,7 @@
 
 `lw.PPOCR.Inference` 是一个统一 PP-OCR 推理项目。项目通过稳定的 C ABI 对外提供一致接口，并将 OpenCV DNN、ONNX Runtime DirectML、便携 ONNX Runtime、OpenVINO、TensorRT 五种推理后端隔离为独立 Runtime。Windows 保持现有四种 Runtime；Linux 正式支持 OpenCV DNN、ONNX Runtime 和 OpenVINO CPU。
 
-当前 Linux 正式版本为 **v1.3.0**，同一个 Release 提供 OpenCV DNN、ONNX Runtime 和 OpenVINO 三个可独立部署的 HTTP 服务包。三个版本均已通过 CI 和 Ubuntu 20.04 虚拟机验证。API v1 与 ABI 继续冻结，各 Linux 后端均为独立 Runtime，不改变既有公共接口。
+当前 Linux 正式版本为 **v1.3.0**，同一个 Release 提供 OpenCV DNN、ONNX Runtime 和 OpenVINO 三个可独立部署的 HTTP 服务包。三个版本均已通过 CI 和 Ubuntu 20.04 虚拟机验证。API v1 与 ABI 继续冻结，各 Linux 后端均为独立 Runtime，不改变既有公共接口。详见 [v1.3.0 Release Notes](docs/releases/v1.3.0.md)。
 
 v1.3.0 三个 Linux 包均面向 Ubuntu 20.04 x86_64，包含完整 OCR、单张/批量只识别、HTTP 测试网页、API Key、systemd、模型和校验文件。Windows 包不能通过替换几个文件转换成 Linux 包，各 Linux 后端首次部署也应使用对应的完整包。
 

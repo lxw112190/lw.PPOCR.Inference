@@ -8,7 +8,7 @@ Author: **天天代码码天天** · QQ: `819069052`
 
 The current project release is **v1.3.0**. API v1 and its ABI remain frozen. The established Windows deployment baseline remains v1.1.0, while v1.3.0 adds the three formal Linux packages without breaking v1.0.0/v1.1.0 callers. See the [v1.1.0 Windows release notes](docs/releases/v1.1.0.md) and the Linux deployment guides below.
 
-The current Linux release is **v1.3.0**. One GitHub Release provides three independently deployable HTTP service packages—OpenCV DNN, ONNX Runtime, and OpenVINO—and all three have passed CI and Ubuntu 20.04 VM validation.
+The current Linux release is **v1.3.0**. One GitHub Release provides three independently deployable HTTP service packages—OpenCV DNN, ONNX Runtime, and OpenVINO—and all three have passed CI and Ubuntu 20.04 VM validation. See the [v1.3.0 Release Notes](docs/releases/v1.3.0.md).
 
 | v1.3.0 Linux package | Device | Description | Guide |
 |---|---|---|---|
