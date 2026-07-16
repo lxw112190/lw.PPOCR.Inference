@@ -36,9 +36,9 @@ jobs:
       - name: Validate model manifests
         run: python3 scripts/validate-model-schema.py
 
-      - name: Cache minimal OpenCV 5.0
+      - name: Restore minimal OpenCV 5.0 cache
         id: opencv-cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: .ci/opencv-5.0.0
           key: opencv-5.0.0-ubuntu-20.04-x64-minimal-v1
@@ -81,6 +81,16 @@ jobs:
             -DWITH_WEBP=OFF
           cmake --build /tmp/opencv-build --parallel 2
           cmake --install /tmp/opencv-build
+
+      # Save immediately after OpenCV succeeds. The combined cache action only
+      # saves during post-job cleanup, so a later project build/test failure can
+      # otherwise force OpenCV to be rebuilt on every retry.
+      - name: Save minimal OpenCV 5.0 cache
+        if: steps.opencv-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .ci/opencv-5.0.0
+          key: ${{ steps.opencv-cache.outputs.cache-primary-key }}
 
       - name: Locate OpenCV package
         run: |

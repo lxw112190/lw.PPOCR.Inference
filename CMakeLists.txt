@@ -39,6 +39,9 @@ set(LW_PPOCR_TEST_TENSORRT_DEVICE_ID "0" CACHE STRING "CUDA device used by integ
 add_library(lw_ppocr_core STATIC
     src/core/config_validation.cpp
 )
+set_target_properties(lw_ppocr_core PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+)
 target_include_directories(lw_ppocr_core
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include

@@ -4,6 +4,9 @@ add_library(lw_ppocr_ocr_core STATIC
     model_manifest.cpp
     ${CMAKE_SOURCE_DIR}/third_party/clipper/clipper.cpp
 )
+set_target_properties(lw_ppocr_ocr_core PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+)
 target_include_directories(lw_ppocr_ocr_core
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
