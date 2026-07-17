@@ -1,0 +1,128 @@
+name: Linux ARM64 OpenCV DNN (openEuler 22.03 SP1)
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PACKAGE_VERSION: 1.4.0-preview.1
+  OPENCV_VERSION: 5.0.0
+  OPENEULER_IMAGE_URL: https://repo.openeuler.org/openEuler-22.03-LTS-SP1/docker_img/aarch64/openEuler-docker.aarch64.tar.xz
+  OPENEULER_IMAGE_SHA256_URL: https://repo.openeuler.org/openEuler-22.03-LTS-SP1/docker_img/aarch64/openEuler-docker.aarch64.tar.xz.sha256sum
+
+jobs:
+  openeuler-22-03-sp1-arm64:
+    name: openEuler 22.03 SP1 ARM64 build, test, package
+    runs-on: ubuntu-22.04-arm
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore openEuler container archive cache
+        id: openeuler-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .ci/downloads/openEuler-docker.aarch64.tar.xz
+          key: openeuler-22.03-lts-sp1-aarch64-container-v1
+
+      - name: Download and verify openEuler ARM64 container
+        if: steps.openeuler-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p .ci/downloads /tmp/openeuler-checksum
+          curl --fail --location --retry 5 --retry-delay 5 \
+            --retry-connrefused \
+            "$OPENEULER_IMAGE_URL" \
+            --output .ci/downloads/openEuler-docker.aarch64.tar.xz
+          curl --fail --location --retry 5 --retry-delay 5 \
+            --retry-connrefused \
+            "$OPENEULER_IMAGE_SHA256_URL" \
+            --output /tmp/openeuler-checksum/openEuler-docker.aarch64.tar.xz.sha256sum
+          cp .ci/downloads/openEuler-docker.aarch64.tar.xz \
+            /tmp/openeuler-checksum/openEuler-docker.aarch64.tar.xz
+          cd /tmp/openeuler-checksum
+          sha256sum -c openEuler-docker.aarch64.tar.xz.sha256sum
+
+      - name: Save openEuler container archive cache
+        if: steps.openeuler-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .ci/downloads/openEuler-docker.aarch64.tar.xz
+          key: ${{ steps.openeuler-cache.outputs.cache-primary-key }}
+
+      - name: Load openEuler image and prepare CI toolchain
+        run: |
+          docker load --input .ci/downloads/openEuler-docker.aarch64.tar.xz
+          BASE_IMAGE="$(docker images --format '{{.Repository}}:{{.Tag}}' \
+            | grep -i openeuler | head -n 1)"
+          test -n "$BASE_IMAGE"
+          echo "Loaded openEuler base image: $BASE_IMAGE"
+          docker run --name lw-ppocr-openeuler-ci-setup "$BASE_IMAGE" \
+            bash -lc "dnf install -y \
+              binutils ca-certificates curl file findutils gcc gcc-c++ git \
+              libjpeg-turbo-devel libpng-devel libtiff-devel make \
+              pkgconf-pkg-config python3 python3-pip tar xz zlib-devel && \
+              python3 -m pip install --no-cache-dir \
+              cmake==3.31.6 ninja==1.11.1.4 jsonschema==4.23.0"
+          docker commit lw-ppocr-openeuler-ci-setup \
+            lw-ppocr-openeuler-22.03-sp1-arm64-ci:latest
+          docker rm lw-ppocr-openeuler-ci-setup
+
+      - name: Confirm native openEuler ARM64 userspace
+        run: |
+          docker run --rm \
+            lw-ppocr-openeuler-22.03-sp1-arm64-ci:latest \
+            bash -lc 'cat /etc/os-release && uname -m && getconf GNU_LIBC_VERSION'
+
+      - name: Restore minimal OpenCV 5.0 ARM64 cache
+        id: opencv-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .ci/opencv-5.0.0-openeuler-arm64
+          key: opencv-5.0.0-openeuler-22.03-sp1-arm64-gcc-armv8a-minimal-v1
+
+      - name: Build minimal OpenCV 5.0 for ARM64
+        if: steps.opencv-cache.outputs.cache-hit != 'true'
+        run: |
+          docker run --rm \
+            -e OPENCV_VERSION="$OPENCV_VERSION" \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            lw-ppocr-openeuler-22.03-sp1-arm64-ci:latest \
+            bash scripts/ci-openeuler-arm64.sh opencv
+
+      # Save OpenCV immediately. A later project or OCR failure must not force
+      # another full OpenCV build on the next CI retry.
+      - name: Save minimal OpenCV 5.0 ARM64 cache
+        if: steps.opencv-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .ci/opencv-5.0.0-openeuler-arm64
+          key: ${{ steps.opencv-cache.outputs.cache-primary-key }}
+
+      - name: Build, test and package ARM64 HTTP service
+        run: |
+          docker run --rm \
+            -e OPENCV_VERSION="$OPENCV_VERSION" \
+            -e PACKAGE_VERSION="$PACKAGE_VERSION" \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            lw-ppocr-openeuler-22.03-sp1-arm64-ci:latest \
+            bash scripts/ci-openeuler-arm64.sh project
+
+      - name: Upload openEuler ARM64 package
+        uses: actions/upload-artifact@v4
+        with:
+          name: lw.PPOCR.Inference-v${{ env.PACKAGE_VERSION }}-linux-arm64-opencv
+          path: |
+            dist/releases/v${{ env.PACKAGE_VERSION }}/lw.PPOCR.Inference-v${{ env.PACKAGE_VERSION }}-linux-arm64-opencv.tar.gz
+            dist/releases/v${{ env.PACKAGE_VERSION }}/lw.PPOCR.Inference-v${{ env.PACKAGE_VERSION }}-linux-arm64-opencv.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 14

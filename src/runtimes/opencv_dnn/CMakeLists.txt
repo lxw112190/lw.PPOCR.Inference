@@ -24,7 +24,8 @@ set_target_properties(lw_ppocr_runtime_opencv_dnn PROPERTIES
 if(WIN32)
     set(LW_PPOCR_OPENCV_INSTALL_DIR "runtimes/win-x64/opencv")
 else()
-    set(LW_PPOCR_OPENCV_INSTALL_DIR "runtimes/linux-x64/opencv")
+    set(LW_PPOCR_OPENCV_INSTALL_DIR
+        "${LW_PPOCR_RUNTIME_ROOT_RELATIVE}/opencv")
     set_target_properties(lw_ppocr_runtime_opencv_dnn PROPERTIES
         BUILD_RPATH "$ORIGIN"
         INSTALL_RPATH "$ORIGIN"

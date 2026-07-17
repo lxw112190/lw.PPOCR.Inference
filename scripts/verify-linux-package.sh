@@ -7,12 +7,26 @@ PACKAGE_DIR="$(cd -- "${PACKAGE_DIR}" && pwd)"
 cd "${PACKAGE_DIR}"
 sha256sum -c package-files.sha256
 
-RUNTIME_LIBRARY="runtimes/linux-x64/opencv/liblw.PPOCR.Runtime.OpenCVDNN.so"
-if [[ -e runtimes/linux-x64/onnxruntime/liblw.PPOCR.Runtime.ONNXRuntime.so ]]; then
-  RUNTIME_LIBRARY="runtimes/linux-x64/onnxruntime/liblw.PPOCR.Runtime.ONNXRuntime.so"
+case "$(uname -m)" in
+  x86_64|amd64) PLATFORM_RID="linux-x64" ;;
+  aarch64|arm64) PLATFORM_RID="linux-arm64" ;;
+  *)
+    echo "Unsupported Linux architecture: $(uname -m)" >&2
+    exit 1
+    ;;
+esac
+
+RUNTIME_LIBRARY="runtimes/${PLATFORM_RID}/opencv/liblw.PPOCR.Runtime.OpenCVDNN.so"
+if [[ -e "runtimes/${PLATFORM_RID}/onnxruntime/liblw.PPOCR.Runtime.ONNXRuntime.so" ]]; then
+  RUNTIME_LIBRARY="runtimes/${PLATFORM_RID}/onnxruntime/liblw.PPOCR.Runtime.ONNXRuntime.so"
 fi
-if [[ -e runtimes/linux-x64/openvino/liblw.PPOCR.Runtime.OpenVINO.so ]]; then
-  RUNTIME_LIBRARY="runtimes/linux-x64/openvino/liblw.PPOCR.Runtime.OpenVINO.so"
+if [[ -e "runtimes/${PLATFORM_RID}/openvino/liblw.PPOCR.Runtime.OpenVINO.so" ]]; then
+  RUNTIME_LIBRARY="runtimes/${PLATFORM_RID}/openvino/liblw.PPOCR.Runtime.OpenVINO.so"
+fi
+
+if [[ ! -e "${RUNTIME_LIBRARY}" ]]; then
+  echo "Runtime library is missing for ${PLATFORM_RID}: ${RUNTIME_LIBRARY}" >&2
+  exit 1
 fi
 
 RUNTIME_DIR="$(dirname -- "${RUNTIME_LIBRARY}")"

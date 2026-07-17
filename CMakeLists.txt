@@ -10,6 +10,28 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
+# Keep the package layout stable while selecting the Linux Runtime directory
+# from the target architecture. Cross-compilers may override
+# CMAKE_SYSTEM_PROCESSOR; native x64 and ARM64 builds are detected directly.
+if(WIN32)
+    set(LW_PPOCR_PLATFORM_RID "win-x64")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" LW_PPOCR_SYSTEM_PROCESSOR_LOWER)
+    if(LW_PPOCR_SYSTEM_PROCESSOR_LOWER MATCHES "^(x86_64|amd64)$")
+        set(LW_PPOCR_PLATFORM_RID "linux-x64")
+    elseif(LW_PPOCR_SYSTEM_PROCESSOR_LOWER MATCHES "^(aarch64|arm64)$")
+        set(LW_PPOCR_PLATFORM_RID "linux-arm64")
+    else()
+        message(FATAL_ERROR
+            "Unsupported Linux architecture: ${CMAKE_SYSTEM_PROCESSOR}. "
+            "Supported architectures are x86_64 and aarch64.")
+    endif()
+else()
+    set(LW_PPOCR_PLATFORM_RID "${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
+endif()
+set(LW_PPOCR_RUNTIME_ROOT_RELATIVE "runtimes/${LW_PPOCR_PLATFORM_RID}")
+message(STATUS "lw.PPOCR platform RID: ${LW_PPOCR_PLATFORM_RID}")
+
 option(LW_PPOCR_BUILD_TESTS "Build ABI and loader smoke tests" ON)
 option(LW_PPOCR_BUILD_STUB_RUNTIME "Build the contract-testing Stub Runtime" ON)
 option(LW_PPOCR_BUILD_OPENCV_RUNTIME "Build the OpenCV DNN Runtime" OFF)
@@ -62,7 +84,9 @@ target_include_directories(lw_ppocr_loader
 )
 target_link_libraries(lw_ppocr_loader PRIVATE lw_ppocr_core ${CMAKE_DL_LIBS})
 target_compile_definitions(lw_ppocr_loader
-    PRIVATE LW_PPOCR_BUILDING_LIBRARY WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE
+    PRIVATE
+        LW_PPOCR_BUILDING_LIBRARY WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE
+        LW_PPOCR_DEFAULT_RUNTIME_ROOT="${LW_PPOCR_RUNTIME_ROOT_RELATIVE}"
 )
 set_target_properties(lw_ppocr_loader PROPERTIES OUTPUT_NAME "lw.PPOCR")
 if(NOT WIN32)
@@ -117,6 +141,7 @@ install(FILES
     docs/tensorrt-engines.md
     docs/http-service.md
     docs/linux-opencv.md
+    docs/linux-opencv-openeuler-arm64.md
     docs/linux-onnxruntime.md
     docs/linux-openvino.md
     models/model-manifest.schema.json

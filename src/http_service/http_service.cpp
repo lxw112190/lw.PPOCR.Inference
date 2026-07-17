@@ -132,6 +132,8 @@ ServiceConfig LoadConfig(const fs::path& path) {
     config.api_key = document.value("api_key", std::string{});
 #if defined(_WIN32)
     constexpr const char* default_runtime_root = "runtimes/win-x64";
+#elif defined(LW_PPOCR_DEFAULT_RUNTIME_ROOT)
+    constexpr const char* default_runtime_root = LW_PPOCR_DEFAULT_RUNTIME_ROOT;
 #else
     constexpr const char* default_runtime_root = "runtimes/linux-x64";
 #endif

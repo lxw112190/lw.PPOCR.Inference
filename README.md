@@ -13,6 +13,7 @@ v1.3.0 三个 Linux 包均面向 Ubuntu 20.04 x86_64，包含完整 OCR、单张
 | v1.3.0 Linux 正式包 | 推理设备 | 说明 | 部署文档 |
 |---|---|---|---|
 | `linux-x64-opencv` | CPU | 最简单的通用 CPU 基线，内置 OpenCV 5.0 | [OpenCV DNN](docs/linux-opencv.md) |
+| `linux-arm64-opencv`（v1.4.0-preview.1） | CPU | openEuler 22.03 LTS-SP1 AArch64，通用 ARMv8-A | [openEuler ARM64 OpenCV DNN](docs/linux-opencv-openeuler-arm64.md) |
 | `linux-x64-onnxruntime-cpu` | CPU / NVIDIA CUDA | 默认内置 ORT 1.26.0 CPU；可替换同版本完整 GPU `.so` 集合 | [ONNX Runtime](docs/linux-onnxruntime.md) |
 | `linux-x64-openvino-cpu` | CPU | 内置 OpenVINO 2025.2.0，适合 Intel/AMD x64 CPU | [OpenVINO](docs/linux-openvino.md) |
 
@@ -76,6 +77,7 @@ runtimes/win-x64/openvino/
 runtimes/win-x64/tensorrt/
 runtimes/linux-x64/opencv/
 runtimes/linux-x64/onnxruntime/
+runtimes/linux-arm64/opencv/
 ```
 
 这种布局可以避免 OpenCV、ONNX Runtime、OpenVINO、CUDA 和 TensorRT 的 DLL 在程序根目录互相影响。
@@ -511,6 +513,25 @@ docs/                    架构、迁移和 TensorRT 文档
 scripts/                 打包脚本
 .github/workflows/       CI 工作流
 ```
+
+## openEuler ARM64 OpenCV DNN 预览包
+
+新增的 `v1.4.0-preview.1` CI 面向 **openEuler 22.03 LTS-SP1 AArch64/ARM64**。它在 GitHub 原生 ARM64 Runner 中加载官方 openEuler 容器，使用通用 `ARMv8-A` 指令基线编译 OpenCV 5.0、Runtime 和 HTTP 服务，并执行 ABI、真实 OCR、只识别、HTTP、ELF 架构及动态库检查。
+
+CI Artifact ZIP 内包含 `.tar.gz` 和 `.tar.gz.sha256`：
+
+```bash
+sha256sum -c lw.PPOCR.Inference-v1.4.0-preview.1-linux-arm64-opencv.tar.gz.sha256
+tar -xzf lw.PPOCR.Inference-v1.4.0-preview.1-linux-arm64-opencv.tar.gz
+cd lw.PPOCR.Inference-v1.4.0-preview.1-linux-arm64-opencv
+sudo ./install-deps-openeuler.sh
+./verify-linux-package.sh
+./run-http-service.sh
+```
+
+浏览器访问 `http://127.0.0.1:8787/`。需要长期运行时，先修改 `http-service.json`，再执行 `sudo ./install-systemd.sh`。局域网访问应同时设置 `listen_host` 为 `0.0.0.0`、配置非空 `api_key`，并通过 `X-API-Key` 请求头传递密钥。完整说明见 [openEuler ARM64 OpenCV DNN 部署文档](docs/linux-opencv-openeuler-arm64.md)。
+
+OpenCV 安装结果使用独立 CI 缓存；只有 OpenCV 版本、openEuler 目标、编译器/ARM 指令基线或模块集合变化时才需要重新编译。该预览包不支持 ARM32，也没有使用 `-march=native`，因此不会绑定到 CI Runner 的特定 ARM CPU。
 
 ## 开源许可证
 

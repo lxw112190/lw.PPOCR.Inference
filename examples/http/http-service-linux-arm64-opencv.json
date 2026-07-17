@@ -1,0 +1,16 @@
+{
+  "listen_host": "127.0.0.1",
+  "port": 8787,
+  "backend": "opencv",
+  "runtime_root": "runtimes/linux-arm64",
+  "model_manifest": "models/ppocrv6-tiny/model.json",
+  "web_root": "www",
+  "device_id": 0,
+  "enable_classifier": true,
+  "worker_threads": 4,
+  "max_request_bytes": 20971520,
+  "max_image_pixels": 40000000,
+  "api_key": "",
+  "service_name": "lw.PPOCR.HttpService.opencv",
+  "service_display_name": "lw.PPOCR HTTP OCR Service (OpenCV DNN ARM64)"
+}

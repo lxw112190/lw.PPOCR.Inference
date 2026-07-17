@@ -124,6 +124,9 @@ std::filesystem::path RuntimeLibraryPath(const lw_ppocr_config& config) {
     } else {
 #if defined(_WIN32)
         root = LoaderDirectory() / L"runtimes" / L"win-x64";
+#elif defined(LW_PPOCR_DEFAULT_RUNTIME_ROOT)
+        root = LoaderDirectory() /
+            std::filesystem::u8path(LW_PPOCR_DEFAULT_RUNTIME_ROOT);
 #else
         root = LoaderDirectory() / "runtimes" / "linux-x64";
 #endif

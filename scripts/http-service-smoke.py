@@ -78,13 +78,13 @@ def main() -> int:
             config = json.loads(
                 (package_dir / "http-service.json").read_text(encoding="utf-8")
             )
+            configured_runtime_root = Path(config.get("runtime_root", ""))
+            if not configured_runtime_root.is_absolute():
+                configured_runtime_root = package_dir / configured_runtime_root
             config.update({
                 "listen_host": "127.0.0.1",
                 "port": port,
-                "runtime_root": str(
-                    package_dir / "runtimes" /
-                    ("win-x64" if is_windows else "linux-x64")
-                ),
+                "runtime_root": str(configured_runtime_root),
                 "model_manifest": str(
                     package_dir / "models" / "ppocrv6-tiny" / "model.json"
                 ),
@@ -111,15 +111,11 @@ def main() -> int:
         if not is_windows:
             library_paths = [str(binary_dir)]
             if package_dir:
-                library_paths.append(str(
-                    package_dir / "runtimes" / "linux-x64" / "opencv"
-                ))
-                library_paths.append(str(
-                    package_dir / "runtimes" / "linux-x64" / "onnxruntime"
-                ))
-                library_paths.append(str(
-                    package_dir / "runtimes" / "linux-x64" / "openvino"
-                ))
+                for runtime_root in sorted((package_dir / "runtimes").glob("linux-*")):
+                    for backend in ("opencv", "onnxruntime", "openvino"):
+                        backend_dir = runtime_root / backend
+                        if backend_dir.is_dir():
+                            library_paths.append(str(backend_dir))
             if environment.get("LD_LIBRARY_PATH"):
                 library_paths.append(environment["LD_LIBRARY_PATH"])
             environment["LD_LIBRARY_PATH"] = os.pathsep.join(library_paths)

@@ -14,6 +14,8 @@
 | Windows 10 22H2 (19045) | x64 | 5.0.0 | v0.2.0 | ✅ |
 | Windows 11 | x64 | 5.0.0 | — | Planned |
 | Windows Server 2022 | x64 | 5.0.0 | — | Planned |
+| Ubuntu 20.04 | x86-64 | 5.0.0 | v1.3.0 | ✅ CI + 虚拟机 |
+| openEuler 22.03 LTS-SP1 | AArch64 / ARMv8-A | 5.0.0 | v1.4.0-preview.1 | CI 待运行、实机待验证 |
 
 **已知限制:**
 - OpenCV 5.0 新图引擎在初始化时输出 `setPreferableTarget Targets are not supported` warning，不影响推理结果。

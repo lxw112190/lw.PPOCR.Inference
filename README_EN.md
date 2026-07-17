@@ -13,6 +13,7 @@ The current Linux release is **v1.3.0**. One GitHub Release provides three indep
 | v1.3.0 Linux package | Device | Description | Guide |
 |---|---|---|---|
 | `linux-x64-opencv` | CPU | Simple general CPU baseline with OpenCV 5.0 | [OpenCV DNN](docs/linux-opencv.md) |
+| `linux-arm64-opencv` (v1.4.0-preview.1) | CPU | openEuler 22.03 LTS-SP1 AArch64, generic ARMv8-A | [openEuler ARM64 OpenCV DNN](docs/linux-opencv-openeuler-arm64.md) |
 | `linux-x64-onnxruntime-cpu` | CPU / NVIDIA CUDA | Bundles ORT 1.26.0 CPU; accepts a complete matching GPU `.so` set | [ONNX Runtime](docs/linux-onnxruntime.md) |
 | `linux-x64-openvino-cpu` | CPU | Bundles OpenVINO 2025.2.0 for Intel/AMD x64 CPUs | [OpenVINO](docs/linux-openvino.md) |
 
@@ -82,6 +83,7 @@ runtimes/win-x64/openvino/
 runtimes/win-x64/tensorrt/
 runtimes/linux-x64/opencv/
 runtimes/linux-x64/onnxruntime/
+runtimes/linux-arm64/opencv/
 ```
 
 This layout prevents OpenCV, ONNX Runtime, OpenVINO, CUDA, and TensorRT libraries from interfering with each other in the application directory.
@@ -520,6 +522,25 @@ docs/                    Architecture, migration, performance, and TensorRT docs
 scripts/                 Packaging scripts
 .github/workflows/       CI workflows
 ```
+
+## openEuler ARM64 OpenCV DNN Preview
+
+The `v1.4.0-preview.1` CI target is built for **openEuler 22.03 LTS-SP1 on AArch64/ARM64**. A native GitHub ARM64 runner loads the official openEuler container, compiles OpenCV 5.0, the Runtime, and the HTTP service for the generic `ARMv8-A` baseline, and runs ABI, real OCR, recognition-only, HTTP, ELF architecture, and shared-library checks.
+
+The CI Artifact ZIP contains the release archive and its SHA256 file:
+
+```bash
+sha256sum -c lw.PPOCR.Inference-v1.4.0-preview.1-linux-arm64-opencv.tar.gz.sha256
+tar -xzf lw.PPOCR.Inference-v1.4.0-preview.1-linux-arm64-opencv.tar.gz
+cd lw.PPOCR.Inference-v1.4.0-preview.1-linux-arm64-opencv
+sudo ./install-deps-openeuler.sh
+./verify-linux-package.sh
+./run-http-service.sh
+```
+
+Open `http://127.0.0.1:8787/`. For permanent deployment, edit `http-service.json` and then run `sudo ./install-systemd.sh`. LAN deployment should bind to `0.0.0.0`, configure a non-empty `api_key`, and send the secret through the `X-API-Key` request header. See the [complete openEuler ARM64 guide](docs/linux-opencv-openeuler-arm64.md).
+
+The installed OpenCV tree has a dedicated CI cache and is rebuilt only when the OpenCV version, target userspace, compiler/ARM baseline, or module set changes. The preview does not support ARM32 and intentionally avoids `-march=native`, so the package is not tied to the runner's specific ARM CPU.
 
 ## License
 

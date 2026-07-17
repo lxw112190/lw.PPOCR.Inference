@@ -17,6 +17,9 @@ target_include_directories(lw_ppocr_http_service SYSTEM PRIVATE
     ${PROJECT_SOURCE_DIR}/third_party/nlohmann-json
 )
 target_link_libraries(lw_ppocr_http_service PRIVATE lw_ppocr_loader)
+target_compile_definitions(lw_ppocr_http_service PRIVATE
+    LW_PPOCR_DEFAULT_RUNTIME_ROOT="${LW_PPOCR_RUNTIME_ROOT_RELATIVE}"
+)
 if(WIN32)
     target_link_libraries(lw_ppocr_http_service PRIVATE
         advapi32 ole32 windowscodecs ws2_32
@@ -40,8 +43,8 @@ else()
     )
     set_target_properties(lw_ppocr_http_service PROPERTIES
         OUTPUT_NAME "lw-ppocr-http-service"
-        BUILD_RPATH "$ORIGIN;$ORIGIN/runtimes/linux-x64/opencv;$ORIGIN/runtimes/linux-x64/onnxruntime;$ORIGIN/runtimes/linux-x64/openvino"
-        INSTALL_RPATH "$ORIGIN;$ORIGIN/runtimes/linux-x64/opencv;$ORIGIN/runtimes/linux-x64/onnxruntime;$ORIGIN/runtimes/linux-x64/openvino"
+        BUILD_RPATH "$ORIGIN;$ORIGIN/${LW_PPOCR_RUNTIME_ROOT_RELATIVE}/opencv;$ORIGIN/${LW_PPOCR_RUNTIME_ROOT_RELATIVE}/onnxruntime;$ORIGIN/${LW_PPOCR_RUNTIME_ROOT_RELATIVE}/openvino"
+        INSTALL_RPATH "$ORIGIN;$ORIGIN/${LW_PPOCR_RUNTIME_ROOT_RELATIVE}/opencv;$ORIGIN/${LW_PPOCR_RUNTIME_ROOT_RELATIVE}/onnxruntime;$ORIGIN/${LW_PPOCR_RUNTIME_ROOT_RELATIVE}/openvino"
     )
 endif()
 
@@ -65,14 +68,25 @@ if(WIN32)
         DESTINATION .
     )
 else()
-    install(FILES ${PROJECT_SOURCE_DIR}/examples/http/http-service-linux.json
+    if(LW_PPOCR_PLATFORM_RID STREQUAL "linux-arm64")
+        set(LW_PPOCR_HTTP_LINUX_CONFIG
+            ${PROJECT_SOURCE_DIR}/examples/http/http-service-linux-arm64-opencv.json)
+        set(LW_PPOCR_HTTP_LINUX_DEPS
+            ${PROJECT_SOURCE_DIR}/examples/http/install-deps-openeuler.sh)
+    else()
+        set(LW_PPOCR_HTTP_LINUX_CONFIG
+            ${PROJECT_SOURCE_DIR}/examples/http/http-service-linux.json)
+        set(LW_PPOCR_HTTP_LINUX_DEPS
+            ${PROJECT_SOURCE_DIR}/examples/http/install-deps-ubuntu.sh)
+    endif()
+    install(FILES ${LW_PPOCR_HTTP_LINUX_CONFIG}
         DESTINATION . RENAME http-service.json
     )
     install(PROGRAMS
         ${PROJECT_SOURCE_DIR}/examples/http/run-http-service.sh
         ${PROJECT_SOURCE_DIR}/examples/http/install-systemd.sh
         ${PROJECT_SOURCE_DIR}/examples/http/uninstall-systemd.sh
-        ${PROJECT_SOURCE_DIR}/examples/http/install-deps-ubuntu.sh
+        ${LW_PPOCR_HTTP_LINUX_DEPS}
         ${PROJECT_SOURCE_DIR}/scripts/verify-linux-package.sh
         DESTINATION .
     )

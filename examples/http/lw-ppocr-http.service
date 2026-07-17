@@ -6,8 +6,7 @@ After=network.target
 Type=simple
 DynamicUser=yes
 WorkingDirectory=/opt/lw-ppocr
-Environment=LD_LIBRARY_PATH=/opt/lw-ppocr:/opt/lw-ppocr/runtimes/linux-x64/opencv
-ExecStart=/opt/lw-ppocr/lw-ppocr-http-service --console --config /opt/lw-ppocr/http-service.json
+ExecStart=/opt/lw-ppocr/run-http-service.sh
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=yes
