@@ -561,7 +561,7 @@ Open `http://127.0.0.1:8787/`. For permanent deployment, edit `http-service.json
 
 The installed OpenCV tree has a dedicated CI cache and is rebuilt only when the OpenCV version, target userspace, compiler/ARM baseline, or module set changes. The preview does not support ARM32 and intentionally avoids `-march=native`, so the package is not tied to the runner's specific ARM CPU.
 
-The domestic Linux ARM64 validation matrix now covers openEuler 22.03 LTS-SP1, Anolis OS 8.10, and OpenCloudOS 9.4 with vendor-provided ARM64 images and post-package real OCR tests. The matrix uploads separate `anolis810` and `opencloudos94` Artifacts; each package records its build environment and includes a generic RPM dependency installer. Kylin V10 and UnionTech OS Server V20 are prepared for official vendor images or labeled self-hosted runners; third-party repackaged images are not treated as release evidence. See [Domestic Linux ARM64 CI and compatibility scope](docs/linux-domestic-arm64-ci.md).
+The domestic Linux ARM64 validation matrix now covers openEuler 22.03 LTS-SP1, Anolis OS 8.10, and OpenCloudOS 9.4. Anolis OS and OpenCloudOS have passed native builds, the complete test suite, packaging, and post-package real OCR tests in their vendor-provided ARM64 images. The matrix uploads separate `anolis810` and `opencloudos94` Artifacts; each package records its build environment and includes a generic RPM dependency installer. Kylin V10 and UnionTech OS Server V20 are prepared for official vendor images or labeled self-hosted runners; third-party repackaged images are not treated as release evidence. See [Domestic Linux ARM64 CI and compatibility scope](docs/linux-domestic-arm64-ci.md).
 
 ## License
 

@@ -147,7 +147,10 @@ def main() -> int:
             with urllib.request.urlopen(
                 f"http://127.0.0.1:{port}/", timeout=10
             ) as page:
-                if "lw.PPOCR 在线体验" not in page.read().decode("utf-8"):
+                page_html = page.read().decode("utf-8")
+                if ("lw.PPOCR 在线体验" not in page_html or
+                        "https://github.com/lxw112190/lw.PPOCR.Inference"
+                        not in page_html):
                     raise RuntimeError("HTTP test page is missing or invalid")
 
             encoded = base64.b64encode(image.read_bytes()).decode("ascii")

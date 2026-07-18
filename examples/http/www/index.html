@@ -11,6 +11,9 @@
     main { width: min(1180px, calc(100% - 28px)); margin: 30px auto 50px; }
     h1 { margin: 0 0 6px; font-size: 28px; }
     .sub { margin: 0; color: #8fa2c7; }
+    .project { margin-top: 8px; font-size: 13px; }
+    .project a { color: #78b7ff; text-decoration: none; overflow-wrap: anywhere; }
+    .project a:hover, .project a:focus-visible { color: #a9d1ff; text-decoration: underline; }
     .card { margin-top: 18px; padding: 18px; border: 1px solid #293755; border-radius: 14px; background: #121a2d; box-shadow: 0 12px 34px #03071255; }
     .toolbar { display: grid; grid-template-columns: minmax(300px,1.2fr) minmax(170px,.65fr) minmax(320px,1.35fr) 150px; gap: 16px; align-items: start; }
     label { display: grid; min-width: 0; gap: 8px; color: #9badcf; font-size: 13px; }
@@ -46,6 +49,7 @@
 <main>
   <h1>lw.PPOCR 在线体验</h1>
   <p class="sub">完整 OCR 会绘制文字区域；“仅识别”适合已经裁剪好的单行文字图片。</p>
+  <p class="sub project">项目地址：<a href="https://github.com/lxw112190/lw.PPOCR.Inference" target="_blank" rel="noopener noreferrer">github.com/lxw112190/lw.PPOCR.Inference</a></p>
   <section class="card">
     <div class="toolbar">
       <label>图片（JPEG / PNG / BMP / GIF / TIFF）<input id="file" type="file" accept="image/*"></label>

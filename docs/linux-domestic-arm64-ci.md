@@ -18,8 +18,8 @@
 | 系统 | 基线 | 镜像来源 | 验证内容 |
 |---|---|---|---|
 | openEuler | 22.03 LTS-SP1 AArch64 | openEuler 官方容器归档 | 已通过 CI 与 ARM64 实体机验证 |
-| Anolis OS | 8.10 AArch64 | `registry.openanolis.cn/openanolis/anolisos:8.10` | 新增矩阵 CI，待首次运行 |
-| OpenCloudOS | 9.4 AArch64 | `opencloudos/opencloudos9-minimal:9.4-v20260424` | 新增矩阵 CI，待首次运行 |
+| Anolis OS | 8.10 AArch64 | `registry.openanolis.cn/openanolis/anolisos:8.10` | ✅ CI 已验证（编译、测试、打包后真实 OCR） |
+| OpenCloudOS | 9.4 AArch64 | `opencloudos/opencloudos9-minimal:9.4-v20260424` | ✅ CI 已验证（编译、测试、打包后真实 OCR） |
 
 工作流：
 
@@ -80,7 +80,7 @@ bash scripts/ci-linux-arm64-opencv.sh project
 
 ## 发布策略
 
-当前正式候选附件仍以已经完成实体机验证的 openEuler ARM64 包为主。Anolis OS 和 OpenCloudOS 首次 CI 成功后先记录为“CI 验证”；只有对应实体机或客户环境也通过 `verify-linux-package.sh`，再提升为“正式支持”。
+当前正式候选附件仍以已经完成实体机验证的 openEuler ARM64 包为主。Anolis OS 和 OpenCloudOS 已记录为“CI 验证”；只有对应实体机或客户环境也通过 `verify-linux-package.sh`，再提升为“正式支持”。
 
 如果后续希望只发布一个通用 ARM64 包，应选择可满足项目编译要求且 glibc 足够旧的基线构建，然后把同一个压缩包放入所有目标系统做运行测试。不要把分别在多个发行版编译出的同名 `.so` 混合到一个包中。
 

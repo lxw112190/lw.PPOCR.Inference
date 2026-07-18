@@ -16,8 +16,8 @@
 | Windows Server 2022 | x64 | 5.0.0 | — | Planned |
 | Ubuntu 20.04 | x86-64 | 5.0.0 | v1.3.0 | ✅ CI + 虚拟机 |
 | openEuler 22.03 LTS-SP1 | AArch64 / ARMv8-A | 5.0.0 | v1.4.0-preview.1 | ✅ CI + ARM64 实体机 |
-| Anolis OS 8.10 | AArch64 / ARMv8-A | 5.0.0 | v1.4.0-preview.1 | CI 待首次运行 |
-| OpenCloudOS 9.4 | AArch64 / ARMv8-A | 5.0.0 | v1.4.0-preview.1 | CI 待首次运行 |
+| Anolis OS 8.10 | AArch64 / ARMv8-A | 5.0.0 | v1.4.0-preview.1 | ✅ CI（官方 ARM64 容器） |
+| OpenCloudOS 9.4 | AArch64 / ARMv8-A | 5.0.0 | v1.4.0-preview.1 | ✅ CI（官方 ARM64 容器） |
 
 **已知限制:**
 - OpenCV 5.0 新图引擎在初始化时输出 `setPreferableTarget Targets are not supported` warning，不影响推理结果。
