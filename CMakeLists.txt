@@ -83,6 +83,12 @@ target_include_directories(lw_ppocr_loader
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/include
 )
 target_link_libraries(lw_ppocr_loader PRIVATE lw_ppocr_core ${CMAKE_DL_LIBS})
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND
+   CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9)
+    # GCC 8 keeps C++17 filesystem symbols in a separate compatibility
+    # library. Anolis OS 8.10 uses GCC 8 by default.
+    target_link_libraries(lw_ppocr_loader PUBLIC stdc++fs)
+endif()
 target_compile_definitions(lw_ppocr_loader
     PRIVATE
         LW_PPOCR_BUILDING_LIBRARY WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE
@@ -142,6 +148,7 @@ install(FILES
     docs/http-service.md
     docs/linux-opencv.md
     docs/linux-opencv-openeuler-arm64.md
+    docs/linux-domestic-arm64-ci.md
     docs/linux-onnxruntime.md
     docs/linux-openvino.md
     models/model-manifest.schema.json

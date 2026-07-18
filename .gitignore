@@ -13,6 +13,7 @@ __pycache__/
 # Visual Studio and editor state
 /.vs/
 /.vscode/
+.env
 *.user
 *.suo
 *.VC.db

@@ -31,7 +31,7 @@ Applications only change backend configuration when switching inference framewor
 - Structured results, JSON results, quadrilateral boxes, confidence scores, and per-stage timings
 - BGR, RGB, BGRA, RGBA, and grayscale image inputs
 - .NET binding, unified CLI, and WinForms demo
-- JSON + Base64 HTTP API, browser test page, Windows Service mode, and Linux systemd integration
+- JSON + Base64 HTTP API, browser test page, Docker Compose, Windows Service mode, and Linux systemd integration
 - Model packages described by `model.json`, without hard-coded artifact names
 - Instance-owned configuration, workers, and memory with explicit initialization and destruction
 
@@ -173,6 +173,25 @@ The browser page has an API Key field and sends it through the same `X-API-Key` 
 The default listener is `127.0.0.1`. For LAN access, change `listen_host` to `0.0.0.0` and also configure an API Key, the operating-system firewall, and trusted-network restrictions. Direct public Internet exposure is not recommended.
 
 On Windows, use `run-http-service.cmd` for foreground execution or run `install-service.cmd` as administrator to install a Windows Service. On Linux, use `./run-http-service.sh` in the foreground or `sudo ./install-systemd.sh` to install under `/opt/lw-ppocr` as a systemd service. See [HTTP API, Windows Service, and Linux systemd](docs/http-service.md) for response fields and detailed deployment instructions.
+
+### Docker Compose
+
+The repository includes a `Dockerfile` and `compose.yaml`. By default, the image
+downloads and verifies the formal `v1.3.0 linux-x64-opencv` package. The models,
+OpenCV DNN Runtime, HTTP service, and browser test page are included, and OpenCV
+is not rebuilt while the image is built:
+
+```bash
+cp .env.example .env
+# Set LW_PPOCR_API_KEY in .env before LAN or reverse-proxy deployment.
+docker compose up -d --build
+docker compose logs -f http-service
+```
+
+Open `http://127.0.0.1:8787/` after startup. The default container is Linux
+x86_64 CPU-only. See [Docker / Docker Compose deployment](docs/docker.md) for
+ports, API Key configuration, custom configuration files, health checks, and
+security guidance.
 
 ### Linux OpenCV DNN HTTP Service Quick Start
 
@@ -541,6 +560,8 @@ sudo ./install-deps-openeuler.sh
 Open `http://127.0.0.1:8787/`. For permanent deployment, edit `http-service.json` and then run `sudo ./install-systemd.sh`. LAN deployment should bind to `0.0.0.0`, configure a non-empty `api_key`, and send the secret through the `X-API-Key` request header. See the [complete openEuler ARM64 guide](docs/linux-opencv-openeuler-arm64.md).
 
 The installed OpenCV tree has a dedicated CI cache and is rebuilt only when the OpenCV version, target userspace, compiler/ARM baseline, or module set changes. The preview does not support ARM32 and intentionally avoids `-march=native`, so the package is not tied to the runner's specific ARM CPU.
+
+The domestic Linux ARM64 validation matrix now covers openEuler 22.03 LTS-SP1, Anolis OS 8.10, and OpenCloudOS 9.4 with vendor-provided ARM64 images and post-package real OCR tests. Kylin V10 and UnionTech OS Server V20 are prepared for official vendor images or labeled self-hosted runners; third-party repackaged images are not treated as release evidence. See [Domestic Linux ARM64 CI and compatibility scope](docs/linux-domestic-arm64-ci.md).
 
 ## License
 

@@ -31,7 +31,7 @@ v1.3.0 三个 Linux 包均面向 Ubuntu 20.04 x86_64，包含完整 OCR、单张
 - 支持结构化结果、JSON 结果、文字框、置信度和分阶段耗时
 - 支持 BGR、RGB、BGRA、RGBA、灰度图等常见像素格式
 - 提供 .NET 封装、命令行程序和 WinForms 体验程序
-- 提供 JSON + Base64 HTTP API、测试网页、Windows Service 和 Linux systemd 部署模式
+- 提供 JSON + Base64 HTTP API、测试网页、Docker Compose、Windows Service 和 Linux systemd 部署模式
 - 模型由 `model.json` 统一描述，应用程序无需硬编码模型文件名
 - 每个引擎实例独立管理配置、线程和内存，可显式初始化与销毁
 
@@ -167,6 +167,22 @@ curl -X POST http://127.0.0.1:8787/api/ocr \
 默认服务只监听 `127.0.0.1`。如需局域网访问，可把 `listen_host` 改为 `0.0.0.0`，同时必须配置 API Key、操作系统防火墙和可信网络访问规则，不建议直接暴露到公网。
 
 Windows 使用 `run-http-service.cmd` 前台启动，或以管理员身份运行 `install-service.cmd` 安装为 Windows Service。Linux 使用 `./run-http-service.sh` 前台启动，或运行 `sudo ./install-systemd.sh` 安装到 `/opt/lw-ppocr` 并注册为 systemd 服务。更完整的配置、响应字段和部署说明见 [HTTP API、Windows Service 与 Linux systemd](docs/http-service.md)。
+
+### Docker Compose
+
+仓库提供 `Dockerfile` 和 `compose.yaml`。默认镜像直接下载并校验正式发布的
+`v1.3.0 linux-x64-opencv` 包，模型、OpenCV DNN Runtime、HTTP 服务和测试网页均已包含，
+镜像构建时不会重新编译 OpenCV：
+
+```bash
+cp .env.example .env
+# 局域网或反向代理部署前，请在 .env 中设置 LW_PPOCR_API_KEY
+docker compose up -d --build
+docker compose logs -f http-service
+```
+
+启动后访问 `http://127.0.0.1:8787/`。默认容器面向 Linux x86_64 CPU；端口、API Key、
+工作线程、自定义配置、健康检查及安全建议见 [Docker / Docker Compose 部署](docs/docker.md)。
 
 ### Linux OpenCV DNN HTTP 服务快速部署
 
@@ -532,6 +548,8 @@ sudo ./install-deps-openeuler.sh
 浏览器访问 `http://127.0.0.1:8787/`。需要长期运行时，先修改 `http-service.json`，再执行 `sudo ./install-systemd.sh`。局域网访问应同时设置 `listen_host` 为 `0.0.0.0`、配置非空 `api_key`，并通过 `X-API-Key` 请求头传递密钥。完整说明见 [openEuler ARM64 OpenCV DNN 部署文档](docs/linux-opencv-openeuler-arm64.md)。
 
 OpenCV 安装结果使用独立 CI 缓存；只有 OpenCV 版本、openEuler 目标、编译器/ARM 指令基线或模块集合变化时才需要重新编译。该预览包不支持 ARM32，也没有使用 `-march=native`，因此不会绑定到 CI Runner 的特定 ARM CPU。
+
+国产 Linux ARM64 自动验证已扩展为发行版矩阵：openEuler 22.03 LTS-SP1 已通过 CI 和实体机验证；Anolis OS 8.10、OpenCloudOS 9.4 使用各自官方 ARM64 容器原生编译并执行完整打包后 OCR 测试。银河麒麟 V10 与统信 UOS V20 预留厂商官方镜像/自托管 Runner 接入方式，不采用第三方重打包镜像作为兼容结论。详见 [国产 Linux ARM64 CI 与兼容范围](docs/linux-domestic-arm64-ci.md)。
 
 ## 开源许可证
 

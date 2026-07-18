@@ -1,0 +1,120 @@
+name: Linux ARM64 Domestic Distribution Matrix
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PACKAGE_VERSION: 1.4.0-preview.1
+  OPENCV_VERSION: 5.0.0
+  CMAKE_VERSION: 3.31.6
+  NINJA_VERSION: 1.12.1
+
+jobs:
+  build-test-package:
+    name: ${{ matrix.display_name }} ARM64
+    runs-on: ubuntu-22.04-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: anolis810
+            display_name: Anolis OS 8.10
+            image: registry.openanolis.cn/openanolis/anolisos:8.10
+          - id: opencloudos94
+            display_name: OpenCloudOS 9.4
+            image: opencloudos/opencloudos9-minimal:9.4-v20260424
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pull official ARM64 base image
+        env:
+          BASE_IMAGE: ${{ matrix.image }}
+        run: docker pull --platform linux/arm64 "$BASE_IMAGE"
+
+      - name: Prepare native build toolchain
+        env:
+          BASE_IMAGE: ${{ matrix.image }}
+          DISTRO_ID: ${{ matrix.id }}
+        run: |
+          docker run --name "lw-ppocr-${DISTRO_ID}-setup" "$BASE_IMAGE" \
+            bash -lc "dnf install -y \
+              binutils ca-certificates curl file findutils gcc gcc-c++ git \
+              libjpeg-turbo-devel libpng-devel libtiff-devel make \
+              pkgconf-pkg-config python3 python3-pip tar xz zlib-devel && \
+              (python3 -c 'import jsonschema' || \
+                python3 -m pip install --no-cache-dir jsonschema==3.2.0) && \
+              curl --fail --location --retry 5 --retry-delay 5 \
+                https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-aarch64.tar.gz \
+                --output /tmp/cmake.tar.gz && \
+              mkdir -p /opt/cmake && \
+              tar -xzf /tmp/cmake.tar.gz --strip-components=1 -C /opt/cmake && \
+              ln -sf /opt/cmake/bin/* /usr/local/bin/ && \
+              curl --fail --location --retry 5 --retry-delay 5 \
+                https://github.com/ninja-build/ninja/archive/refs/tags/v${NINJA_VERSION}.tar.gz \
+                --output /tmp/ninja.tar.gz && \
+              mkdir -p /tmp/ninja-source && \
+              tar -xzf /tmp/ninja.tar.gz --strip-components=1 -C /tmp/ninja-source && \
+              cd /tmp/ninja-source && python3 configure.py --bootstrap && \
+              install -m 0755 ninja /usr/local/bin/ninja && \
+              cmake --version && ninja --version && \
+              rm -rf /tmp/cmake.tar.gz /tmp/ninja.tar.gz /tmp/ninja-source"
+          docker commit "lw-ppocr-${DISTRO_ID}-setup" \
+            "lw-ppocr-${DISTRO_ID}-arm64-ci:latest"
+          docker rm "lw-ppocr-${DISTRO_ID}-setup"
+
+      - name: Confirm distribution, architecture and glibc
+        env:
+          DISTRO_ID: ${{ matrix.id }}
+        run: |
+          docker run --rm "lw-ppocr-${DISTRO_ID}-arm64-ci:latest" \
+            bash -lc 'cat /etc/os-release && uname -m && getconf GNU_LIBC_VERSION && gcc --version | head -n 1'
+
+      - name: Restore distribution-specific OpenCV cache
+        id: opencv-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .ci/opencv-${{ env.OPENCV_VERSION }}-${{ matrix.id }}-arm64
+          key: opencv-${{ env.OPENCV_VERSION }}-${{ matrix.id }}-arm64-gcc-armv8a-minimal-v1
+
+      - name: Build minimal OpenCV for this distribution
+        if: steps.opencv-cache.outputs.cache-hit != 'true'
+        env:
+          DISTRO_ID: ${{ matrix.id }}
+        run: |
+          docker run --rm \
+            -e CI_DISTRO_ID="$DISTRO_ID" \
+            -e OPENCV_VERSION="$OPENCV_VERSION" \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            "lw-ppocr-${DISTRO_ID}-arm64-ci:latest" \
+            bash scripts/ci-linux-arm64-opencv.sh opencv
+
+      - name: Save distribution-specific OpenCV cache
+        if: steps.opencv-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .ci/opencv-${{ env.OPENCV_VERSION }}-${{ matrix.id }}-arm64
+          key: ${{ steps.opencv-cache.outputs.cache-primary-key }}
+
+      - name: Build, test and verify packaged HTTP service
+        env:
+          DISTRO_ID: ${{ matrix.id }}
+        run: |
+          docker run --rm \
+            -e CI_DISTRO_ID="$DISTRO_ID" \
+            -e OPENCV_VERSION="$OPENCV_VERSION" \
+            -e PACKAGE_VERSION="$PACKAGE_VERSION" \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            "lw-ppocr-${DISTRO_ID}-arm64-ci:latest" \
+            bash scripts/ci-linux-arm64-opencv.sh project

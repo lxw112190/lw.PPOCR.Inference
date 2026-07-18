@@ -1,0 +1,103 @@
+name: Docker Compose
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/docker.yml"
+      - ".dockerignore"
+      - ".env.example"
+      - "compose.yaml"
+      - "docker/**"
+      - "docs/docker.md"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/docker.yml"
+      - ".dockerignore"
+      - ".env.example"
+      - "compose.yaml"
+      - "docker/**"
+      - "docs/docker.md"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-x64-opencv:
+    name: Linux x64 OpenCV image and HTTP smoke
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    env:
+      LW_PPOCR_API_KEY: lw-ppocr-docker-ci-secret
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build image from verified Release package
+        run: docker compose build --pull http-service
+
+      - name: Start service
+        run: docker compose up -d --no-build http-service
+
+      - name: Wait for health check and test authentication
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8787/health >/tmp/health.json; then
+              break
+            fi
+            if [[ "${attempt}" == 60 ]]; then
+              docker compose logs http-service
+              exit 1
+            fi
+            sleep 1
+          done
+          python3 - <<'PY'
+          import base64
+          import json
+          import urllib.error
+          import urllib.request
+          from pathlib import Path
+
+          base = "http://127.0.0.1:8787"
+          health = json.loads(urllib.request.urlopen(base + "/health").read())
+          assert health.get("ok"), health
+
+          encoded = base64.b64encode(
+              Path("models/ppocrv6-tiny/sample.jpg").read_bytes()
+          ).decode("ascii")
+          body = json.dumps({"image_base64": encoded}).encode("utf-8")
+          request = urllib.request.Request(
+              base + "/api/ocr",
+              data=body,
+              headers={"Content-Type": "application/json"},
+          )
+          try:
+              urllib.request.urlopen(request, timeout=30)
+              raise AssertionError("request without API Key was accepted")
+          except urllib.error.HTTPError as error:
+              assert error.code == 401, error.code
+
+          request.add_header("X-API-Key", "lw-ppocr-docker-ci-secret")
+          result = json.loads(urllib.request.urlopen(request, timeout=60).read())
+          assert result.get("ok"), result
+          assert result.get("result"), result
+          assert isinstance(result.get("timing"), dict), result
+          print(
+              "Docker HTTP smoke passed:",
+              f"backend={health.get('backend_name')}",
+              f"regions={len(result['result'])}",
+          )
+          PY
+
+      - name: Show service logs
+        if: always()
+        run: docker compose logs --no-color http-service
+
+      - name: Stop service
+        if: always()
+        run: docker compose down --volumes --remove-orphans
