@@ -148,6 +148,7 @@ install(FILES
     docs/http-service.md
     docs/linux-opencv.md
     docs/linux-opencv-openeuler-arm64.md
+    docs/linux-opencv-domestic-arm64.md
     docs/linux-domestic-arm64-ci.md
     docs/linux-onnxruntime.md
     docs/linux-openvino.md

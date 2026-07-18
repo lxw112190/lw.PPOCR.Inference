@@ -1,5 +1,8 @@
 name: Linux ARM64 Domestic Distribution Matrix
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
@@ -22,6 +25,7 @@ jobs:
   build-test-package:
     name: ${{ matrix.display_name }} ARM64
     runs-on: ubuntu-22.04-arm
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -29,12 +33,18 @@ jobs:
           - id: anolis810
             display_name: Anolis OS 8.10
             image: registry.openanolis.cn/openanolis/anolisos:8.10
+            python_packages: python3.11 python3.11-pip
+            python_bin: python3.11
+            cache_revision: anolis810-v1
           - id: opencloudos94
             display_name: OpenCloudOS 9.4
             image: opencloudos/opencloudos9-minimal:9.4-v20260424
+            python_packages: python3 python3-pip
+            python_bin: python3
+            cache_revision: opencloudos94-v20260424-v1
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Pull official ARM64 base image
         env:
@@ -45,32 +55,48 @@ jobs:
         env:
           BASE_IMAGE: ${{ matrix.image }}
           DISTRO_ID: ${{ matrix.id }}
+          PYTHON_PACKAGES: ${{ matrix.python_packages }}
+          PYTHON_BIN: ${{ matrix.python_bin }}
         run: |
-          docker run --name "lw-ppocr-${DISTRO_ID}-setup" "$BASE_IMAGE" \
-            bash -lc "dnf install -y \
+          container="lw-ppocr-${DISTRO_ID}-setup"
+          docker rm --force "$container" >/dev/null 2>&1 || true
+          cleanup() { docker rm --force "$container" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          docker run --name "$container" \
+            -e CI_PYTHON_PACKAGES="$PYTHON_PACKAGES" \
+            -e CI_PYTHON_BIN="$PYTHON_BIN" \
+            -e CMAKE_VERSION="$CMAKE_VERSION" \
+            -e NINJA_VERSION="$NINJA_VERSION" \
+            "$BASE_IMAGE" \
+            bash -lc 'dnf install -y \
               binutils ca-certificates curl file findutils gcc gcc-c++ git \
-              libjpeg-turbo-devel libpng-devel libtiff-devel make \
-              pkgconf-pkg-config python3 python3-pip tar xz zlib-devel && \
-              (python3 -c 'import jsonschema' || \
-                python3 -m pip install --no-cache-dir jsonschema==3.2.0) && \
+              gzip libjpeg-turbo-devel libpng-devel libtiff-devel make \
+              pkgconf-pkg-config ${CI_PYTHON_PACKAGES} tar xz zlib-devel && \
+              "${CI_PYTHON_BIN}" -m pip install --no-cache-dir \
+                jsonschema==4.23.0 && \
+              "${CI_PYTHON_BIN}" -c \
+                "from jsonschema import Draft202012Validator" && \
               curl --fail --location --retry 5 --retry-delay 5 \
-                https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-aarch64.tar.gz \
+                "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-aarch64.tar.gz" \
                 --output /tmp/cmake.tar.gz && \
               mkdir -p /opt/cmake && \
               tar -xzf /tmp/cmake.tar.gz --strip-components=1 -C /opt/cmake && \
               ln -sf /opt/cmake/bin/* /usr/local/bin/ && \
               curl --fail --location --retry 5 --retry-delay 5 \
-                https://github.com/ninja-build/ninja/archive/refs/tags/v${NINJA_VERSION}.tar.gz \
+                "https://github.com/ninja-build/ninja/archive/refs/tags/v${NINJA_VERSION}.tar.gz" \
                 --output /tmp/ninja.tar.gz && \
               mkdir -p /tmp/ninja-source && \
               tar -xzf /tmp/ninja.tar.gz --strip-components=1 -C /tmp/ninja-source && \
-              cd /tmp/ninja-source && python3 configure.py --bootstrap && \
+              cd /tmp/ninja-source && \
+              "${CI_PYTHON_BIN}" configure.py --bootstrap && \
               install -m 0755 ninja /usr/local/bin/ninja && \
               cmake --version && ninja --version && \
-              rm -rf /tmp/cmake.tar.gz /tmp/ninja.tar.gz /tmp/ninja-source"
-          docker commit "lw-ppocr-${DISTRO_ID}-setup" \
+              "${CI_PYTHON_BIN}" --version && \
+              rm -rf /tmp/cmake.tar.gz /tmp/ninja.tar.gz /tmp/ninja-source'
+          docker commit "$container" \
             "lw-ppocr-${DISTRO_ID}-arm64-ci:latest"
-          docker rm "lw-ppocr-${DISTRO_ID}-setup"
+          cleanup
+          trap - EXIT
 
       - name: Confirm distribution, architecture and glibc
         env:
@@ -81,19 +107,23 @@ jobs:
 
       - name: Restore distribution-specific OpenCV cache
         id: opencv-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: .ci/opencv-${{ env.OPENCV_VERSION }}-${{ matrix.id }}-arm64
-          key: opencv-${{ env.OPENCV_VERSION }}-${{ matrix.id }}-arm64-gcc-armv8a-minimal-v1
+          key: opencv-${{ env.OPENCV_VERSION }}-${{ matrix.cache_revision }}-arm64-gcc-armv8a-minimal-v1
 
       - name: Build minimal OpenCV for this distribution
         if: steps.opencv-cache.outputs.cache-hit != 'true'
         env:
           DISTRO_ID: ${{ matrix.id }}
+          PYTHON_BIN: ${{ matrix.python_bin }}
         run: |
           docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
             -e CI_DISTRO_ID="$DISTRO_ID" \
             -e OPENCV_VERSION="$OPENCV_VERSION" \
+            -e PYTHON_BIN="$PYTHON_BIN" \
             -v "$GITHUB_WORKSPACE:/workspace" \
             -w /workspace \
             "lw-ppocr-${DISTRO_ID}-arm64-ci:latest" \
@@ -101,7 +131,7 @@ jobs:
 
       - name: Save distribution-specific OpenCV cache
         if: steps.opencv-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: .ci/opencv-${{ env.OPENCV_VERSION }}-${{ matrix.id }}-arm64
           key: ${{ steps.opencv-cache.outputs.cache-primary-key }}
@@ -109,12 +139,27 @@ jobs:
       - name: Build, test and verify packaged HTTP service
         env:
           DISTRO_ID: ${{ matrix.id }}
+          PYTHON_BIN: ${{ matrix.python_bin }}
         run: |
           docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
             -e CI_DISTRO_ID="$DISTRO_ID" \
             -e OPENCV_VERSION="$OPENCV_VERSION" \
             -e PACKAGE_VERSION="$PACKAGE_VERSION" \
+            -e PYTHON_BIN="$PYTHON_BIN" \
             -v "$GITHUB_WORKSPACE:/workspace" \
             -w /workspace \
             "lw-ppocr-${DISTRO_ID}-arm64-ci:latest" \
             bash scripts/ci-linux-arm64-opencv.sh project
+
+      - name: Upload distribution-specific ARM64 package
+        uses: actions/upload-artifact@v7
+        with:
+          name: lw.PPOCR.Inference-v${{ env.PACKAGE_VERSION }}-linux-arm64-opencv-${{ matrix.id }}
+          path: |
+            dist/releases/v${{ env.PACKAGE_VERSION }}/lw.PPOCR.Inference-v${{ env.PACKAGE_VERSION }}-linux-arm64-opencv.tar.gz
+            dist/releases/v${{ env.PACKAGE_VERSION }}/lw.PPOCR.Inference-v${{ env.PACKAGE_VERSION }}-linux-arm64-opencv.tar.gz.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14

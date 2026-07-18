@@ -35,14 +35,14 @@ jobs:
           python3 -m pip install --no-cache-dir \
             cmake==3.31.6 ninja==1.11.1.4 jsonschema==4.23.0
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Validate model manifests
         run: python3 scripts/validate-model-schema.py
 
       - name: Restore minimal OpenCV 5.0 cache
         id: opencv-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: .ci/opencv-5.0.0
           key: opencv-5.0.0-ubuntu-20.04-x64-minimal-v1
@@ -88,14 +88,14 @@ jobs:
 
       - name: Save minimal OpenCV 5.0 cache
         if: steps.opencv-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: .ci/opencv-5.0.0
           key: ${{ steps.opencv-cache.outputs.cache-primary-key }}
 
       - name: Restore ONNX Runtime CPU cache
         id: ort-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: .ci/onnxruntime-linux-x64-${{ env.ORT_VERSION }}
           key: onnxruntime-${{ env.ORT_VERSION }}-linux-x64-cpu-v1
@@ -114,7 +114,7 @@ jobs:
 
       - name: Save ONNX Runtime CPU cache
         if: steps.ort-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: .ci/onnxruntime-linux-x64-${{ env.ORT_VERSION }}
           key: ${{ steps.ort-cache.outputs.cache-primary-key }}
@@ -185,7 +185,7 @@ jobs:
           ldd "$PACKAGE/lw-ppocr-http-service"
 
       - name: Upload Linux ONNX Runtime CPU package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lw.PPOCR.Inference-v${{ env.PACKAGE_VERSION }}-linux-x64-onnxruntime-cpu
           path: |

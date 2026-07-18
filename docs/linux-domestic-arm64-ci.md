@@ -38,7 +38,16 @@
 6. 生成完整部署包并从打包目录重新启动服务。
 7. 使用 `readelf` 和 `ldd` 验证 AArch64 架构及动态库完整性。
 
-Anolis OS 8.10 默认 GCC 8，工程会在该编译器上为 C++17 filesystem 自动链接 `stdc++fs`。不同发行版的 OpenCV 缓存互不复用，避免把某一系统的 glibc 或 libstdc++ 依赖带入另一系统。
+Anolis OS 8.10 默认 GCC 8，工程会在该编译器上为 C++17 filesystem 自动链接 `stdc++fs`。CI 显式安装并使用 Anolis 8.10 的 Python 3.11 兼容包，以满足模型校验和 HTTP 冒烟脚本的 Python 3.10+ 语法要求。不同发行版的 OpenCV 缓存互不复用，避免把某一系统的 glibc 或 libstdc++ 依赖带入另一系统。
+
+矩阵中的每个发行版都会上传独立 Artifact：
+
+```text
+lw.PPOCR.Inference-v1.4.0-preview.1-linux-arm64-opencv-anolis810
+lw.PPOCR.Inference-v1.4.0-preview.1-linux-arm64-opencv-opencloudos94
+```
+
+外层 Artifact 名称区分构建用户态，压缩包内的 `BUILD-ENVIRONMENT.txt` 记录发行版、glibc、GCC 与架构。压缩包文件名为保持 API/发布命名一致而相同，不应把不同 Artifact 解压到同一目录或混用其中的 `.so`。矩阵包使用 [国产 Linux ARM64 部署说明](linux-opencv-domestic-arm64.md)，并保留 `install-deps-openeuler.sh` 兼容入口；Anolis/OpenCloudOS 推荐运行通用的 `install-deps-rpm.sh`。
 
 ## 银河麒麟与统信 UOS
 

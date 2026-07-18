@@ -18,9 +18,9 @@ jobs:
     runs-on: windows-2022
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -38,7 +38,7 @@ jobs:
     runs-on: windows-2022
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
@@ -57,7 +57,7 @@ jobs:
       - name: ABI stability test
         run: ctest --preset vs2022-x64-release -R lw.ppocr.abi.stability --output-on-failure
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -98,7 +98,7 @@ jobs:
     runs-on: windows-2022
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
@@ -107,7 +107,7 @@ jobs:
 
       - name: Cache OpenCV
         id: opencv-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/opencv
           key: opencv-5.0.0-windows-x64-v3
@@ -238,7 +238,7 @@ jobs:
 
       - name: Upload built binaries
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lw.PPOCR.Inference-OpenCV-win-x64
           path: |
@@ -257,7 +257,7 @@ jobs:
     runs-on: windows-2022
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1

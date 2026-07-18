@@ -10,6 +10,7 @@ BUILD_DIR="$(cd -- "$1" && pwd)"
 OUTPUT_DIR="${2:-dist/releases/v1.4.0-preview.1}"
 VERSION="${3:-1.4.0-preview.1}"
 PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+CI_DISTRO_ID="${CI_DISTRO_ID:-openeuler}"
 mkdir -p "${OUTPUT_DIR}"
 OUTPUT_DIR="$(cd -- "${OUTPUT_DIR}" && pwd)"
 
@@ -25,8 +26,23 @@ cmake --install "${BUILD_DIR}" --prefix "${PACKAGE_DIR}"
 # machine-specific and must not be distributed in this ARM64 package.
 find "${PACKAGE_DIR}/models" -type f -name '*.engine' -delete
 
-cp "${PROJECT_ROOT}/docs/linux-opencv-openeuler-arm64.md" \
-  "${PACKAGE_DIR}/LINUX-README.md"
+case "${CI_DISTRO_ID}" in
+  openeuler*)
+    PACKAGE_README="${PROJECT_ROOT}/docs/linux-opencv-openeuler-arm64.md"
+    ;;
+  *)
+    PACKAGE_README="${PROJECT_ROOT}/docs/linux-opencv-domestic-arm64.md"
+    ;;
+esac
+cp "${PACKAGE_README}" "${PACKAGE_DIR}/LINUX-README.md"
+
+{
+  echo "ci_distribution_id=${CI_DISTRO_ID}"
+  cat /etc/os-release
+  echo "architecture=$(uname -m)"
+  echo "glibc_version=$(getconf GNU_LIBC_VERSION)"
+  echo "gcc_version=$(gcc -dumpfullversion -dumpversion)"
+} > "${PACKAGE_DIR}/BUILD-ENVIRONMENT.txt"
 
 REQUIRED_FILES=(
   "liblw.PPOCR.so.1"
@@ -34,6 +50,7 @@ REQUIRED_FILES=(
   "http-service.json"
   "run-http-service.sh"
   "install-deps-openeuler.sh"
+  "install-deps-rpm.sh"
   "install-systemd.sh"
   "verify-linux-package.sh"
   "www/index.html"
@@ -43,6 +60,7 @@ REQUIRED_FILES=(
   "models/ppocrv6-tiny/cls.onnx"
   "models/ppocrv6-tiny/ppocr_keys.txt"
   "runtimes/linux-arm64/opencv/liblw.PPOCR.Runtime.OpenCVDNN.so"
+  "BUILD-ENVIRONMENT.txt"
 )
 for required in "${REQUIRED_FILES[@]}"; do
   if [[ ! -e "${PACKAGE_DIR}/${required}" ]]; then

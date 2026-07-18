@@ -6,6 +6,7 @@ PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 OPENCV_VERSION="${OPENCV_VERSION:-5.0.0}"
 CI_DISTRO_ID="${CI_DISTRO_ID:-generic}"
 PACKAGE_VERSION="${PACKAGE_VERSION:-1.4.0-preview.1}"
+PYTHON_BIN="${PYTHON_BIN:-python3}"
 
 if [[ ! "${CI_DISTRO_ID}" =~ ^[a-z0-9][a-z0-9._-]*$ ]]; then
   echo "CI_DISTRO_ID contains unsupported characters: ${CI_DISTRO_ID}" >&2
@@ -17,6 +18,10 @@ BUILD_DIR="${BUILD_DIR:-${PROJECT_ROOT}/build/ci-${CI_DISTRO_ID}-arm64}"
 
 if [[ "$(uname -m)" != "aarch64" ]]; then
   echo "This script must run natively on AArch64, got: $(uname -m)" >&2
+  exit 1
+fi
+if ! command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
+  echo "Python interpreter is unavailable: ${PYTHON_BIN}" >&2
   exit 1
 fi
 
@@ -79,7 +84,7 @@ case "${MODE}" in
     getconf GNU_LIBC_VERSION
     gcc --version | head -n 1
     test "$(uname -m)" = "aarch64"
-    python3 "${PROJECT_ROOT}/scripts/validate-model-schema.py"
+    "${PYTHON_BIN}" "${PROJECT_ROOT}/scripts/validate-model-schema.py"
 
     OPENCV_CONFIG="$(find "${OPENCV_ROOT}" \
       -name OpenCVConfig.cmake -print -quit)"
@@ -109,7 +114,7 @@ case "${MODE}" in
     cmake --build "${BUILD_DIR}" --parallel 2
     export LD_LIBRARY_PATH="${BUILD_DIR}/bin:${OPENCV_LIB}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
     ctest --test-dir "${BUILD_DIR}" --output-on-failure --verbose
-    python3 "${PROJECT_ROOT}/scripts/http-service-smoke.py" \
+    "${PYTHON_BIN}" "${PROJECT_ROOT}/scripts/http-service-smoke.py" \
       --binary-dir "${BUILD_DIR}/bin"
 
     bash "${PROJECT_ROOT}/scripts/package-linux-arm64-opencv.sh" \
@@ -118,7 +123,7 @@ case "${MODE}" in
       "${PACKAGE_VERSION}"
 
     PACKAGE_DIR="${PROJECT_ROOT}/dist/releases/v${PACKAGE_VERSION}/staging-linux-arm64/lw.PPOCR.Inference-v${PACKAGE_VERSION}-linux-arm64-opencv"
-    python3 "${PROJECT_ROOT}/scripts/http-service-smoke.py" \
+    "${PYTHON_BIN}" "${PROJECT_ROOT}/scripts/http-service-smoke.py" \
       --package-dir "${PACKAGE_DIR}"
     bash "${PACKAGE_DIR}/verify-linux-package.sh" "${PACKAGE_DIR}"
 

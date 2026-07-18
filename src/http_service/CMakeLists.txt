@@ -72,7 +72,8 @@ else()
         set(LW_PPOCR_HTTP_LINUX_CONFIG
             ${PROJECT_SOURCE_DIR}/examples/http/http-service-linux-arm64-opencv.json)
         set(LW_PPOCR_HTTP_LINUX_DEPS
-            ${PROJECT_SOURCE_DIR}/examples/http/install-deps-openeuler.sh)
+            ${PROJECT_SOURCE_DIR}/examples/http/install-deps-openeuler.sh
+            ${PROJECT_SOURCE_DIR}/examples/http/install-deps-rpm.sh)
     else()
         set(LW_PPOCR_HTTP_LINUX_CONFIG
             ${PROJECT_SOURCE_DIR}/examples/http/http-service-linux.json)

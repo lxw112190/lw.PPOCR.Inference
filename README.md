@@ -549,7 +549,7 @@ sudo ./install-deps-openeuler.sh
 
 OpenCV 安装结果使用独立 CI 缓存；只有 OpenCV 版本、openEuler 目标、编译器/ARM 指令基线或模块集合变化时才需要重新编译。该预览包不支持 ARM32，也没有使用 `-march=native`，因此不会绑定到 CI Runner 的特定 ARM CPU。
 
-国产 Linux ARM64 自动验证已扩展为发行版矩阵：openEuler 22.03 LTS-SP1 已通过 CI 和实体机验证；Anolis OS 8.10、OpenCloudOS 9.4 使用各自官方 ARM64 容器原生编译并执行完整打包后 OCR 测试。银河麒麟 V10 与统信 UOS V20 预留厂商官方镜像/自托管 Runner 接入方式，不采用第三方重打包镜像作为兼容结论。详见 [国产 Linux ARM64 CI 与兼容范围](docs/linux-domestic-arm64-ci.md)。
+国产 Linux ARM64 自动验证已扩展为发行版矩阵：openEuler 22.03 LTS-SP1 已通过 CI 和实体机验证；Anolis OS 8.10、OpenCloudOS 9.4 使用各自官方 ARM64 容器原生编译并执行完整打包后 OCR 测试。矩阵分别上传带 `anolis810`、`opencloudos94` 后缀的 Artifact，包内记录实际构建环境并提供 RPM 系部署脚本。银河麒麟 V10 与统信 UOS V20 预留厂商官方镜像/自托管 Runner 接入方式，不采用第三方重打包镜像作为兼容结论。详见 [国产 Linux ARM64 CI 与兼容范围](docs/linux-domestic-arm64-ci.md)。
 
 ## 开源许可证
 

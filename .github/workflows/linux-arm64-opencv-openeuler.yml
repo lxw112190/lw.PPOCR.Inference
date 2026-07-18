@@ -24,11 +24,11 @@ jobs:
     runs-on: ubuntu-22.04-arm
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Restore openEuler container archive cache
         id: openeuler-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: .ci/downloads/openEuler-docker.aarch64.tar.xz
           key: openeuler-22.03-lts-sp1-aarch64-container-v1
@@ -52,7 +52,7 @@ jobs:
 
       - name: Save openEuler container archive cache
         if: steps.openeuler-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: .ci/downloads/openEuler-docker.aarch64.tar.xz
           key: ${{ steps.openeuler-cache.outputs.cache-primary-key }}
@@ -83,7 +83,7 @@ jobs:
 
       - name: Restore minimal OpenCV 5.0 ARM64 cache
         id: opencv-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: .ci/opencv-5.0.0-openeuler-arm64
           key: opencv-5.0.0-openeuler-22.03-sp1-arm64-gcc-armv8a-minimal-v1
@@ -102,7 +102,7 @@ jobs:
       # another full OpenCV build on the next CI retry.
       - name: Save minimal OpenCV 5.0 ARM64 cache
         if: steps.opencv-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: .ci/opencv-5.0.0-openeuler-arm64
           key: ${{ steps.opencv-cache.outputs.cache-primary-key }}
@@ -118,7 +118,7 @@ jobs:
             bash scripts/ci-openeuler-arm64.sh project
 
       - name: Upload openEuler ARM64 package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lw.PPOCR.Inference-v${{ env.PACKAGE_VERSION }}-linux-arm64-opencv
           path: |
