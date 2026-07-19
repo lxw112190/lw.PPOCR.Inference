@@ -4,6 +4,8 @@
 
 作者：**天天代码码天天**　QQ：`819069052`
 
+QQ Group: C# 人工智能实践 | 群号: 758616458
+
 `lw.PPOCR.Inference` 是一个统一 PP-OCR 推理项目。项目通过稳定的 C ABI 对外提供一致接口，并将 OpenCV DNN、ONNX Runtime DirectML、便携 ONNX Runtime、OpenVINO、TensorRT 五种推理后端隔离为独立 Runtime。Windows 保持现有四种 Runtime；Linux 正式支持 OpenCV DNN、ONNX Runtime 和 OpenVINO CPU。
 
 当前 Linux 正式版本为 **v1.3.0**，同一个 Release 提供 OpenCV DNN、ONNX Runtime 和 OpenVINO 三个可独立部署的 HTTP 服务包。三个版本均已通过 CI 和 Ubuntu 20.04 虚拟机验证。API v1 与 ABI 继续冻结，各 Linux 后端均为独立 Runtime，不改变既有公共接口。详见 [v1.3.0 Release Notes](docs/releases/v1.3.0.md)。
@@ -550,6 +552,14 @@ sudo ./install-deps-openeuler.sh
 OpenCV 安装结果使用独立 CI 缓存；只有 OpenCV 版本、openEuler 目标、编译器/ARM 指令基线或模块集合变化时才需要重新编译。该预览包不支持 ARM32，也没有使用 `-march=native`，因此不会绑定到 CI Runner 的特定 ARM CPU。
 
 国产 Linux ARM64 自动验证已扩展为发行版矩阵：openEuler 22.03 LTS-SP1 已通过 CI 和实体机验证；Anolis OS 8.10、OpenCloudOS 9.4 已在各自官方 ARM64 容器中通过原生编译、完整测试、打包后真实 OCR 验证。矩阵分别上传带 `anolis810`、`opencloudos94` 后缀的 Artifact，包内记录实际构建环境并提供 RPM 系部署脚本。银河麒麟 V10 与统信 UOS V20 预留厂商官方镜像/自托管 Runner 接入方式，不采用第三方重打包镜像作为兼容结论。详见 [国产 Linux ARM64 CI 与兼容范围](docs/linux-domestic-arm64-ci.md)。
+
+## 赞助支持
+
+如果这个项目对您有所帮助，欢迎通过微信赞助支持项目的持续维护。
+
+<p align="center">
+  <img src="docs/assets/sponsor.jpg" alt="微信赞助" width="360">
+</p>
 
 ## 开源许可证
 

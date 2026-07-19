@@ -96,6 +96,7 @@ function Assert-Package($directory, $kind, $runtimes = @()) {
             "docs/abi-v1-stability.md",
             "docs/license-audit.md",
             "docs/http-service.md",
+            "docs/assets/sponsor.jpg",
             "docs/v1.0.0.md",
             "docs/v1.1.0.md",
             "models/model-manifest.schema.json",

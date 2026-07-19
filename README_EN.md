@@ -4,6 +4,8 @@
 
 Author: **天天代码码天天** · QQ: `819069052`
 
+QQ Group: C# 人工智能实践 | 群号: 758616458
+
 `lw.PPOCR.Inference` is a unified PP-OCR inference project. It exposes one stable C ABI and isolates OpenCV DNN, ONNX Runtime DirectML, portable ONNX Runtime, OpenVINO, and TensorRT as independent Runtime plugins. Windows keeps its four established Runtimes; Linux formally supports OpenCV DNN, ONNX Runtime, and OpenVINO CPU packages.
 
 The current project release is **v1.3.0**. API v1 and its ABI remain frozen. The established Windows deployment baseline remains v1.1.0, while v1.3.0 adds the three formal Linux packages without breaking v1.0.0/v1.1.0 callers. See the [v1.1.0 Windows release notes](docs/releases/v1.1.0.md) and the Linux deployment guides below.
@@ -562,6 +564,14 @@ Open `http://127.0.0.1:8787/`. For permanent deployment, edit `http-service.json
 The installed OpenCV tree has a dedicated CI cache and is rebuilt only when the OpenCV version, target userspace, compiler/ARM baseline, or module set changes. The preview does not support ARM32 and intentionally avoids `-march=native`, so the package is not tied to the runner's specific ARM CPU.
 
 The domestic Linux ARM64 validation matrix now covers openEuler 22.03 LTS-SP1, Anolis OS 8.10, and OpenCloudOS 9.4. Anolis OS and OpenCloudOS have passed native builds, the complete test suite, packaging, and post-package real OCR tests in their vendor-provided ARM64 images. The matrix uploads separate `anolis810` and `opencloudos94` Artifacts; each package records its build environment and includes a generic RPM dependency installer. Kylin V10 and UnionTech OS Server V20 are prepared for official vendor images or labeled self-hosted runners; third-party repackaged images are not treated as release evidence. See [Domestic Linux ARM64 CI and compatibility scope](docs/linux-domestic-arm64-ci.md).
+
+## Sponsor
+
+If this project is useful to you, you are welcome to support its continued maintenance through WeChat Pay.
+
+<p align="center">
+  <img src="docs/assets/sponsor.jpg" alt="Sponsor via WeChat Pay" width="360">
+</p>
 
 ## License
 

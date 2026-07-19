@@ -113,6 +113,7 @@ install(TARGETS lw_ppocr_loader
 )
 install(DIRECTORY include/ DESTINATION include)
 install(FILES README.md README_EN.md LICENSE DESTINATION .)
+install(FILES docs/assets/sponsor.jpg DESTINATION docs/assets)
 install(FILES third_party/clipper/LICENSE.txt
     DESTINATION licenses
     RENAME clipper-BSL-1.0.txt
